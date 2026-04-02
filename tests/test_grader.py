@@ -1,7 +1,7 @@
 """Tests for grading logic -- must be deterministic and in [0.0, 1.0]."""
 
 import pytest
-from incident_triage_env.grader import grade_diagnosis
+from incident_triage_env.grader import grade_diagnosis, grade_investigation_quality
 
 
 class TestGraderDeterminism:
@@ -71,3 +71,123 @@ class TestGraderRange:
         gt = {"service": "svc", "fault_type": "oom", "remediation": "restart"}
         r = grade_diagnosis(None, None, None, gt, [])
         assert 0.0 <= r["score"] <= 1.0
+
+
+class TestInvestigationQuality:
+    """Investigation quality scoring must reward good methodology."""
+
+    TOPOLOGY = {
+        "api-gateway": ["auth-service"],
+        "auth-service": ["user-db"],
+        "user-db": [],
+    }
+    CHAIN = ["auth-service"]
+    SERVICES = ["api-gateway", "auth-service", "user-db"]
+
+    def test_empty_history_returns_zero(self):
+        r = grade_investigation_quality([], self.CHAIN, self.SERVICES, self.TOPOLOGY)
+        assert r["score"] == 0.0
+
+    def test_topology_first_gets_bonus(self):
+        history = [
+            {"action_type": "check_topology", "target_service": None},
+            {"action_type": "query_logs", "target_service": "auth-service"},
+        ]
+        r = grade_investigation_quality(history, self.CHAIN, self.SERVICES, self.TOPOLOGY)
+        assert r["breakdown"].get("topology_timing", 0) > 0
+
+    def test_causal_chain_coverage_rewarded(self):
+        history = [
+            {"action_type": "query_logs", "target_service": "auth-service"},
+        ]
+        r = grade_investigation_quality(history, self.CHAIN, self.SERVICES, self.TOPOLOGY)
+        assert r["breakdown"].get("causal_chain_coverage", 0) > 0
+
+    def test_cross_referencing_rewarded(self):
+        history = [
+            {"action_type": "query_logs", "target_service": "auth-service"},
+            {"action_type": "query_metrics", "target_service": "auth-service"},
+        ]
+        r = grade_investigation_quality(history, self.CHAIN, self.SERVICES, self.TOPOLOGY)
+        assert r["breakdown"].get("cross_reference_depth", 0) > 0
+
+    def test_focused_investigation_rewarded(self):
+        # Only investigate relevant services
+        history = [
+            {"action_type": "query_logs", "target_service": "auth-service"},
+        ]
+        r1 = grade_investigation_quality(history, self.CHAIN, self.SERVICES, self.TOPOLOGY)
+
+        # Waste time on irrelevant services
+        history_noisy = [
+            {"action_type": "query_logs", "target_service": "auth-service"},
+            {"action_type": "query_logs", "target_service": "user-db"},
+            {"action_type": "query_logs", "target_service": "api-gateway"},
+        ]
+        r2 = grade_investigation_quality(history_noisy, self.CHAIN, self.SERVICES, self.TOPOLOGY)
+
+        assert r1["breakdown"].get("investigation_focus", 0) >= r2["breakdown"].get("investigation_focus", 0)
+
+    def test_score_capped_at_030(self):
+        # Even with perfect investigation, score caps at 0.30
+        history = [
+            {"action_type": "check_topology", "target_service": None},
+            {"action_type": "query_logs", "target_service": "auth-service"},
+            {"action_type": "query_metrics", "target_service": "auth-service"},
+        ]
+        r = grade_investigation_quality(history, self.CHAIN, self.SERVICES, self.TOPOLOGY)
+        assert r["score"] <= 0.30
+
+    def test_deterministic(self):
+        history = [
+            {"action_type": "check_topology", "target_service": None},
+            {"action_type": "query_logs", "target_service": "auth-service"},
+        ]
+        scores = [
+            grade_investigation_quality(history, self.CHAIN, self.SERVICES, self.TOPOLOGY)["score"]
+            for _ in range(100)
+        ]
+        assert len(set(scores)) == 1
+
+
+class TestBlindDiagnosisPenalty:
+    """Agents that diagnose without investigating should be penalized."""
+
+    def test_immediate_diagnosis_penalized(self):
+        """Diagnosing on step 0 with no investigation gets penalty."""
+        from incident_triage_env.env import IncidentTriageEnv
+        from models import IncidentAction
+
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+        _, score, done, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+        # Perfect diagnosis with 0 investigation should score < 1.0
+        assert score < 1.0
+        assert done is True
+
+    def test_investigated_diagnosis_not_penalized(self):
+        """Proper investigation before diagnosis gets full score."""
+        from incident_triage_env.env import IncidentTriageEnv
+        from models import IncidentAction
+
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="query_logs", target_service=gt["service"]))
+        env.step(IncidentAction(action_type="query_metrics", target_service=gt["service"]))
+        _, score, done, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+        # Good investigation + perfect diagnosis should score high
+        assert score > 0.85
+        assert done is True

@@ -81,13 +81,13 @@ class TestScenarioPools:
     """Must have minimum scenario counts."""
 
     def test_minimum_easy_scenarios(self):
-        assert len(EASY_SCENARIOS) >= 2
+        assert len(EASY_SCENARIOS) >= 3
 
     def test_minimum_medium_scenarios(self):
-        assert len(MEDIUM_SCENARIOS) >= 1
+        assert len(MEDIUM_SCENARIOS) >= 3
 
     def test_minimum_hard_scenarios(self):
-        assert len(HARD_SCENARIOS) >= 1
+        assert len(HARD_SCENARIOS) >= 2
 
     def test_get_scenario_valid(self):
         for task in ["easy", "medium", "hard"]:

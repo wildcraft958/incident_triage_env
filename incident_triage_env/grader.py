@@ -1,4 +1,4 @@
-"""Deterministic scoring for agent diagnoses."""
+"""Deterministic scoring for agent diagnoses and investigation quality."""
 
 
 def grade_diagnosis(
@@ -52,3 +52,102 @@ def grade_diagnosis(
         message = "Partial credit: " + ", ".join(parts) + "."
 
     return {"score": score, "breakdown": breakdown, "message": message}
+
+
+def grade_investigation_quality(
+    history: list[dict],
+    causal_chain: list[str],
+    all_services: list[str],
+    topology: dict,
+) -> dict:
+    """Score the quality of the investigation process.
+
+    Rewards agents that follow good SRE methodology:
+    1. Understand the system (check topology early)
+    2. Investigate causal chain services
+    3. Cross-reference logs and metrics for the same service
+    4. Stay focused on relevant services
+    5. Follow dependency links in investigation order
+
+    Returns dict with 'score' in [0.0, 0.30] and 'breakdown'.
+    """
+    if not history:
+        return {"score": 0.0, "breakdown": {}}
+
+    score = 0.0
+    breakdown = {}
+
+    # 1. Did agent check topology early? (0.0-0.05)
+    topo_positions = [
+        i for i, h in enumerate(history)
+        if h["action_type"] == "check_topology"
+    ]
+    if topo_positions:
+        earliest = topo_positions[0]
+        topo_score = max(0.0, 0.05 - (earliest * 0.01))
+        score += topo_score
+        breakdown["topology_timing"] = round(topo_score, 3)
+
+    # 2. Causal chain coverage (0.0-0.10)
+    investigated = set()
+    for h in history:
+        if h.get("target_service") and h["action_type"] in (
+            "query_logs", "query_metrics", "trace_request"
+        ):
+            investigated.add(h["target_service"])
+
+    chain_set = set(causal_chain)
+    if chain_set:
+        coverage = len(investigated & chain_set) / len(chain_set)
+        coverage_score = round(coverage * 0.10, 3)
+        score += coverage_score
+        breakdown["causal_chain_coverage"] = coverage_score
+
+    # 3. Cross-referencing: logs AND metrics for same causal service (0.0-0.05)
+    log_services = {
+        h["target_service"] for h in history
+        if h["action_type"] == "query_logs" and h.get("target_service")
+    }
+    metric_services = {
+        h["target_service"] for h in history
+        if h["action_type"] == "query_metrics" and h.get("target_service")
+    }
+    cross_referenced = log_services & metric_services & chain_set
+    if chain_set:
+        depth = len(cross_referenced) / len(chain_set)
+        depth_score = round(depth * 0.05, 3)
+        score += depth_score
+        breakdown["cross_reference_depth"] = depth_score
+
+    # 4. Focus ratio: relevant vs total investigated (0.0-0.05)
+    total_investigated = len(investigated)
+    relevant_investigated = len(investigated & chain_set)
+    if total_investigated > 0:
+        focus = relevant_investigated / total_investigated
+        focus_score = round(focus * 0.05, 3)
+        score += focus_score
+        breakdown["investigation_focus"] = focus_score
+
+    # 5. Logical flow: did agent follow dependency edges? (0.0-0.05)
+    investigated_order = [
+        h["target_service"] for h in history
+        if h.get("target_service") and h["action_type"] in (
+            "query_logs", "query_metrics"
+        )
+    ]
+    follows_deps = 0
+    for i in range(1, len(investigated_order)):
+        prev_svc = investigated_order[i - 1]
+        curr_svc = investigated_order[i]
+        prev_deps = topology.get(prev_svc, [])
+        curr_deps = topology.get(curr_svc, [])
+        if curr_svc in prev_deps or prev_svc in curr_deps:
+            follows_deps += 1
+
+    if len(investigated_order) > 1:
+        flow = follows_deps / (len(investigated_order) - 1)
+        flow_score = round(flow * 0.05, 3)
+        score += flow_score
+        breakdown["logical_flow"] = flow_score
+
+    return {"score": round(min(score, 0.30), 3), "breakdown": breakdown}

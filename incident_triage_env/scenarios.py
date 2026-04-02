@@ -215,7 +215,103 @@ _easy_disk_001: Dict = {
     },
 }
 
-EASY_SCENARIOS: List[Dict] = [_easy_oom_001, _easy_disk_001]
+_easy_cert_001: Dict = {
+    "id": "easy-cert-001",
+    "real_incident_ref": "common-mtls-cert-expiry",
+    "incident_summary": (
+        "ALERT: Intermittent 503 errors on API endpoints. "
+        "mTLS handshake failures detected between api-gateway and auth-service. "
+        "Error rate climbing over last 30 minutes."
+    ),
+    "services": ["api-gateway", "auth-service", "user-service", "cert-manager"],
+    "topology": {
+        "api-gateway": ["auth-service", "user-service"],
+        "auth-service": [],
+        "user-service": [],
+        "cert-manager": ["auth-service"],
+    },
+    "root_cause": {
+        "service": "cert-manager",
+        "fault_type": "certificate_expired",
+        "remediation": "renew_certificate",
+    },
+    "causal_chain": ["cert-manager", "auth-service"],
+    "logs": {
+        "api-gateway": [
+            "2025-04-01T09:30:01Z [INFO] gateway.TLS: Initiating mTLS handshake with auth-service",
+            "2025-04-01T09:30:02Z [ERROR] gateway.TLS: SSL_ERROR_SSL: certificate verify failed: certificate has expired",
+            "2025-04-01T09:30:02Z [ERROR] gateway.TLS: Peer certificate CN=auth-service expired at 2025-04-01T09:00:00Z",
+            "2025-04-01T09:30:03Z [WARN] gateway.Router: Falling back to non-mTLS route (DENIED by security policy)",
+            "2025-04-01T09:30:04Z [ERROR] gateway.Router: Cannot reach auth-service: TLS required by policy",
+            "2025-04-01T09:30:10Z [WARN] gateway.CircuitBreaker: auth-service error rate 65% (threshold: 10%)",
+        ],
+        "auth-service": [
+            "2025-04-01T09:30:01Z [ERROR] server.TLS: Incoming connection rejected: our certificate expired",
+            "2025-04-01T09:30:02Z [ERROR] server.TLS: Certificate /etc/certs/service.pem not valid after 2025-04-01T09:00:00Z",
+            "2025-04-01T09:30:03Z [WARN] server.TLS: Cert auto-renewal failed: cert-manager connection timeout",
+            "2025-04-01T09:30:10Z [INFO] server.Health: HTTP health check OK (health endpoint is non-TLS)",
+        ],
+        "user-service": [
+            "2025-04-01T09:30:00Z [INFO] service.Main: Processing requests normally",
+            "2025-04-01T09:30:05Z [INFO] service.Main: All upstream connections healthy",
+            "2025-04-01T09:30:10Z [INFO] service.Metrics: request_rate=120/s error_rate=0%",
+        ],
+        "cert-manager": [
+            "2025-04-01T08:55:00Z [WARN] certmgr.Renewal: Certificate for auth-service expires in 5 minutes",
+            "2025-04-01T08:58:00Z [ERROR] certmgr.Renewal: Failed to generate new certificate: CA connection timeout",
+            "2025-04-01T08:59:00Z [ERROR] certmgr.Renewal: Retry 1/3 failed: CA unreachable",
+            "2025-04-01T08:59:30Z [ERROR] certmgr.Renewal: Retry 2/3 failed: CA unreachable",
+            "2025-04-01T09:00:00Z [FATAL] certmgr.Renewal: Certificate for auth-service EXPIRED before renewal",
+            "2025-04-01T09:00:01Z [ERROR] certmgr.Status: cert_manager_renewal_failures_total=3 cert_manager_expired_total=1",
+        ],
+    },
+    "metrics": {
+        "api-gateway": {
+            "cpu_pct": 14.0, "memory_pct": 33.0, "error_rate_pct": 65.0,
+            "tls_handshake_failures": 847, "latency_p99_ms": 52.0, "requests_per_sec": 280.0,
+        },
+        "auth-service": {
+            "cpu_pct": 5.0, "memory_pct": 18.0, "error_rate_pct": 0.0,
+            "connections_rejected": 412, "latency_p99_ms": 0.0, "requests_per_sec": 0.0,
+        },
+        "user-service": {
+            "cpu_pct": 10.0, "memory_pct": 24.0, "error_rate_pct": 0.0,
+            "latency_p99_ms": 8.0, "requests_per_sec": 120.0,
+        },
+        "cert-manager": {
+            "cpu_pct": 6.0, "memory_pct": 12.0, "error_rate_pct": 0.0,
+            "renewal_failures": 3, "certs_expired": 1, "requests_per_sec": 0.5,
+        },
+    },
+    "alerts": [
+        {
+            "name": "TLSHandshakeFailures",
+            "severity": "P1",
+            "service": "api-gateway",
+            "message": "TLS handshake failure rate > 50% on auth-service upstream",
+            "fired_at": "2025-04-01T09:30:05Z",
+        },
+        {
+            "name": "CertRenewalFailed",
+            "severity": "P2",
+            "service": "cert-manager",
+            "message": "Certificate renewal failed for auth-service after 3 retries",
+            "fired_at": "2025-04-01T09:00:01Z",
+        },
+    ],
+    "traces": {
+        "trace-cert-001": {
+            "request": "POST /api/v1/login",
+            "spans": [
+                {"service": "api-gateway", "duration_ms": 52, "status": "TLS handshake failed"},
+                {"service": "auth-service", "duration_ms": 0, "status": "connection rejected: cert expired"},
+            ],
+            "outcome": "503 Service Unavailable",
+        },
+    },
+}
+
+EASY_SCENARIOS: List[Dict] = [_easy_oom_001, _easy_disk_001, _easy_cert_001]
 
 
 # ----------------------------------------------------------------------
@@ -516,7 +612,133 @@ _medium_config_001: Dict = {
     },
 }
 
-MEDIUM_SCENARIOS: List[Dict] = [_medium_connleak_001, _medium_config_001]
+_medium_thunderherd_001: Dict = {
+    "id": "medium-thunderherd-001",
+    "real_incident_ref": "slack-2020-provisioning-storm",
+    "incident_summary": (
+        "ALERT: config-service CPU at 100%, latency > 10s. "
+        "Multiple new worker instances stuck in 'starting' state. "
+        "Autoscaler triggered 15 minutes ago due to traffic spike. "
+        "New instances are not serving traffic."
+    ),
+    "services": [
+        "load-balancer", "autoscaler", "config-service",
+        "worker-pool", "metrics-collector",
+    ],
+    "topology": {
+        "load-balancer": ["worker-pool"],
+        "autoscaler": ["metrics-collector", "worker-pool", "config-service"],
+        "config-service": [],
+        "worker-pool": ["config-service"],
+        "metrics-collector": ["worker-pool"],
+    },
+    "root_cause": {
+        "service": "config-service",
+        "fault_type": "cpu_saturated",
+        "remediation": "scale_up",
+    },
+    "causal_chain": ["config-service", "worker-pool", "autoscaler"],
+    "logs": {
+        "load-balancer": [
+            "2025-04-01T16:00:00Z [INFO] lb.Router: Traffic spike detected: 2400 rps (normal: 800 rps)",
+            "2025-04-01T16:00:05Z [WARN] lb.HealthCheck: 3/10 worker instances unhealthy",
+            "2025-04-01T16:05:00Z [WARN] lb.HealthCheck: 7/10 worker instances unhealthy",
+            "2025-04-01T16:10:00Z [ERROR] lb.Router: Only 3 healthy backends, queuing requests",
+            "2025-04-01T16:10:01Z [WARN] lb.Router: Request queue depth: 1200 (threshold: 100)",
+        ],
+        "autoscaler": [
+            "2025-04-01T15:45:00Z [INFO] autoscaler.Monitor: CPU across worker-pool avg 85% (threshold: 70%)",
+            "2025-04-01T15:45:01Z [INFO] autoscaler.Scaler: Scaling worker-pool from 10 to 25 instances",
+            "2025-04-01T15:45:10Z [INFO] autoscaler.Scaler: 15 new instances provisioned, waiting for ready",
+            "2025-04-01T15:50:00Z [WARN] autoscaler.Scaler: 0/15 new instances ready after 5 minutes",
+            "2025-04-01T15:55:00Z [ERROR] autoscaler.Scaler: 0/15 new instances ready after 10 minutes",
+            "2025-04-01T16:00:00Z [WARN] autoscaler.Monitor: worker-pool still at 10 effective instances",
+        ],
+        "config-service": [
+            "2025-04-01T15:45:12Z [INFO] config.Server: Received bootstrap request from worker-instance-11",
+            "2025-04-01T15:45:13Z [INFO] config.Server: Received bootstrap request from worker-instance-12",
+            "2025-04-01T15:45:13Z [INFO] config.Server: Received bootstrap request from worker-instance-13",
+            "2025-04-01T15:45:14Z [WARN] config.Server: Request queue depth: 15 (all new workers bootstrapping)",
+            "2025-04-01T15:45:15Z [WARN] config.ThreadPool: All 8 handler threads busy",
+            "2025-04-01T15:45:20Z [ERROR] config.Server: Request timeout after 5000ms for worker-instance-14",
+            "2025-04-01T15:45:25Z [ERROR] config.Server: Request timeout after 5000ms for worker-instance-15",
+            "2025-04-01T15:46:00Z [ERROR] config.Server: CPU at 100%, GC pause 3200ms",
+            "2025-04-01T15:50:00Z [ERROR] config.Server: 45 requests queued, avg response time 12000ms",
+        ],
+        "worker-pool": [
+            "2025-04-01T15:45:12Z [INFO] worker.Bootstrap: Starting instance worker-instance-11",
+            "2025-04-01T15:45:13Z [INFO] worker.Bootstrap: Requesting config from config-service...",
+            "2025-04-01T15:45:18Z [WARN] worker.Bootstrap: Config request slow: 5000ms elapsed",
+            "2025-04-01T15:45:25Z [ERROR] worker.Bootstrap: Config request timed out after 10000ms",
+            "2025-04-01T15:45:26Z [ERROR] worker.Bootstrap: Cannot start without config, retrying in 30s",
+            "2025-04-01T15:46:00Z [ERROR] worker.Bootstrap: Retry 1 failed: config-service timeout",
+            "2025-04-01T15:47:00Z [ERROR] worker.Bootstrap: Retry 2 failed: config-service timeout",
+        ],
+        "metrics-collector": [
+            "2025-04-01T15:45:00Z [INFO] metrics.Scraper: Scrape complete: 10 targets in 200ms",
+            "2025-04-01T15:50:00Z [WARN] metrics.Scraper: Scrape slow: 10 targets in 4500ms",
+            "2025-04-01T15:55:00Z [INFO] metrics.Scraper: Scrape complete: 10 targets in 300ms",
+        ],
+    },
+    "metrics": {
+        "load-balancer": {
+            "cpu_pct": 35.0, "memory_pct": 28.0, "error_rate_pct": 40.0,
+            "request_queue_depth": 1200, "requests_per_sec": 2400.0,
+        },
+        "autoscaler": {
+            "cpu_pct": 8.0, "memory_pct": 15.0, "error_rate_pct": 0.0,
+            "pending_instances": 15, "scaling_events_24h": 1,
+        },
+        "config-service": {
+            "cpu_pct": 100.0, "memory_pct": 72.0, "error_rate_pct": 60.0,
+            "request_queue_depth": 45, "avg_response_ms": 12000.0,
+            "active_threads": 8, "max_threads": 8,
+        },
+        "worker-pool": {
+            "cpu_pct": 88.0, "memory_pct": 55.0, "error_rate_pct": 15.0,
+            "healthy_instances": 10, "total_instances": 25,
+        },
+        "metrics-collector": {
+            "cpu_pct": 5.0, "memory_pct": 10.0, "error_rate_pct": 0.0,
+            "scrape_duration_ms": 300.0,
+        },
+    },
+    "alerts": [
+        {
+            "name": "ConfigServiceCPU",
+            "severity": "P2",
+            "service": "config-service",
+            "message": "config-service CPU at 100% for >10 minutes",
+            "fired_at": "2025-04-01T15:55:00Z",
+        },
+        {
+            "name": "WorkerPoolDegraded",
+            "severity": "P1",
+            "service": "worker-pool",
+            "message": "Only 10/25 worker instances healthy",
+            "fired_at": "2025-04-01T16:00:00Z",
+        },
+        {
+            "name": "HighRequestQueue",
+            "severity": "P1",
+            "service": "load-balancer",
+            "message": "Request queue depth 1200 (threshold: 100)",
+            "fired_at": "2025-04-01T16:10:01Z",
+        },
+    ],
+    "traces": {
+        "trace-thunder-001": {
+            "request": "GET /api/health (worker-instance-11 bootstrap)",
+            "spans": [
+                {"service": "worker-pool", "duration_ms": 10000, "status": "timeout"},
+                {"service": "config-service", "duration_ms": 10000, "status": "timeout: all threads busy"},
+            ],
+            "outcome": "timeout: worker failed to bootstrap",
+        },
+    },
+}
+
+MEDIUM_SCENARIOS: List[Dict] = [_medium_connleak_001, _medium_config_001, _medium_thunderherd_001]
 
 
 # ----------------------------------------------------------------------
@@ -735,7 +957,166 @@ _hard_kafka_staleness_001: Dict = {
     },
 }
 
-HARD_SCENARIOS: List[Dict] = [_hard_kafka_staleness_001]
+_hard_network_blindspot_001: Dict = {
+    "id": "hard-network-blindspot-001",
+    "real_incident_ref": "meta-2021-bgp-outage-adapted",
+    "incident_summary": (
+        "ALERT: Multiple services reporting elevated error rates. "
+        "Monitoring dashboards showing gaps in data. "
+        "Users reporting intermittent failures across all products. "
+        "No recent deployments in the last 24 hours."
+    ),
+    "services": [
+        "network-controller", "dns-resolver", "api-gateway",
+        "auth-service", "order-service", "monitoring-pipeline",
+        "cache-layer",
+    ],
+    "topology": {
+        "network-controller": [],
+        "dns-resolver": ["network-controller"],
+        "api-gateway": ["dns-resolver", "auth-service", "order-service"],
+        "auth-service": ["dns-resolver", "cache-layer"],
+        "order-service": ["dns-resolver", "cache-layer"],
+        "monitoring-pipeline": ["dns-resolver", "network-controller"],
+        "cache-layer": ["dns-resolver"],
+    },
+    "root_cause": {
+        "service": "network-controller",
+        "fault_type": "config_error",
+        "remediation": "rollback",
+    },
+    "causal_chain": [
+        "network-controller", "dns-resolver", "api-gateway",
+        "monitoring-pipeline",
+    ],
+    "logs": {
+        "network-controller": [
+            "2025-04-01T11:00:00Z [INFO] netctrl.ConfigManager: Applying routing update batch-2025-0401-001",
+            "2025-04-01T11:00:01Z [INFO] netctrl.ConfigManager: Update applied to 3/3 route tables",
+            "2025-04-01T11:00:02Z [INFO] netctrl.ConfigManager: Configuration committed",
+            "2025-04-01T11:00:05Z [INFO] netctrl.HealthCheck: All interfaces UP",
+            "2025-04-01T11:05:00Z [INFO] netctrl.HealthCheck: All interfaces UP",
+            "2025-04-01T11:10:00Z [INFO] netctrl.HealthCheck: All interfaces UP",
+        ],
+        "dns-resolver": [
+            "2025-04-01T11:00:10Z [WARN] dns.Resolver: Upstream network latency increased: 450ms (normal: 2ms)",
+            "2025-04-01T11:00:15Z [ERROR] dns.Resolver: Timeout resolving auth-service.internal: network unreachable for route 10.0.3.0/24",
+            "2025-04-01T11:00:20Z [ERROR] dns.Resolver: 40% of DNS queries failing with SERVFAIL",
+            "2025-04-01T11:00:30Z [WARN] dns.Cache: Serving stale records for 12 domains (TTL expired, refresh failed)",
+            "2025-04-01T11:05:00Z [ERROR] dns.Resolver: Persistent SERVFAIL rate: 45%",
+        ],
+        "api-gateway": [
+            "2025-04-01T11:00:20Z [ERROR] gateway.DNS: Failed to resolve auth-service.internal",
+            "2025-04-01T11:00:21Z [ERROR] gateway.Router: Cannot route to auth-service: DNS failure",
+            "2025-04-01T11:00:25Z [WARN] gateway.Router: Falling back to cached IP for auth-service",
+            "2025-04-01T11:00:30Z [ERROR] gateway.Router: Cached IP for auth-service stale, connection refused",
+            "2025-04-01T11:01:00Z [ERROR] gateway.Router: 60% of requests failing: mixed DNS and connection errors",
+        ],
+        "auth-service": [
+            "2025-04-01T11:00:20Z [WARN] auth.Cache: Cannot refresh cache: dns resolution failed for cache-layer.internal",
+            "2025-04-01T11:00:25Z [INFO] auth.Cache: Serving from local cache (stale: 15 minutes)",
+            "2025-04-01T11:00:30Z [WARN] auth.Connector: Intermittent connection failures to cache-layer",
+            "2025-04-01T11:01:00Z [INFO] auth.Health: Service responding to direct-IP health checks",
+        ],
+        "order-service": [
+            "2025-04-01T11:00:22Z [ERROR] order.DNS: Failed to resolve cache-layer.internal: SERVFAIL",
+            "2025-04-01T11:00:25Z [WARN] order.Connector: Using stale DNS record for cache-layer",
+            "2025-04-01T11:01:00Z [ERROR] order.RequestHandler: 30% of orders failing at cache lookup",
+        ],
+        "monitoring-pipeline": [
+            "2025-04-01T11:00:15Z [WARN] monitor.Scraper: Scrape failed for dns-resolver: connection timeout",
+            "2025-04-01T11:00:20Z [WARN] monitor.Scraper: Scrape failed for api-gateway: DNS resolution failed",
+            "2025-04-01T11:00:25Z [ERROR] monitor.Pipeline: Cannot push metrics to aggregator: network route unavailable",
+            "2025-04-01T11:05:00Z [ERROR] monitor.Pipeline: Metrics gap: no data for 5 services since 11:00:00",
+            "2025-04-01T11:10:00Z [ERROR] monitor.Pipeline: Metrics gap continues. Dashboard data is STALE.",
+        ],
+        "cache-layer": [
+            "2025-04-01T11:00:18Z [WARN] cache.Network: Increased latency on internal network: 200ms (normal: 1ms)",
+            "2025-04-01T11:00:20Z [WARN] cache.Replication: Replication lag to replica-2: 5000ms",
+            "2025-04-01T11:00:30Z [INFO] cache.Server: Serving requests from primary, replica sync delayed",
+        ],
+    },
+    "metrics": {
+        "network-controller": {
+            "cpu_pct": 5.0, "memory_pct": 12.0, "error_rate_pct": 0.0,
+            "interfaces_up": 3, "interfaces_total": 3,
+            "route_updates_24h": 1,
+        },
+        "dns-resolver": {
+            "cpu_pct": 45.0, "memory_pct": 30.0, "error_rate_pct": 45.0,
+            "query_rate_rps": 8000.0, "servfail_pct": 45.0,
+            "cache_hit_pct": 55.0,
+        },
+        "api-gateway": {
+            "cpu_pct": 22.0, "memory_pct": 35.0, "error_rate_pct": 60.0,
+            "latency_p99_ms": 8500.0, "requests_per_sec": 1200.0,
+        },
+        "auth-service": {
+            "cpu_pct": 15.0, "memory_pct": 28.0, "error_rate_pct": 10.0,
+            "latency_p99_ms": 200.0, "requests_per_sec": 500.0,
+        },
+        "order-service": {
+            "cpu_pct": 18.0, "memory_pct": 32.0, "error_rate_pct": 30.0,
+            "latency_p99_ms": 3000.0, "requests_per_sec": 300.0,
+        },
+        "monitoring-pipeline": {
+            "cpu_pct": 10.0, "memory_pct": 15.0, "error_rate_pct": 80.0,
+            "metrics_gap_seconds": 600, "scrape_failures": 5,
+        },
+        "cache-layer": {
+            "cpu_pct": 20.0, "memory_pct": 55.0, "error_rate_pct": 5.0,
+            "replication_lag_ms": 5000.0, "latency_p99_ms": 200.0,
+        },
+    },
+    "blind_metrics": {
+        "api-gateway": {
+            "error_rate_pct": "N/A (scrape failed)",
+            "latency_p99_ms": "N/A (scrape failed)",
+            "requests_per_sec": "N/A (scrape failed)",
+            "_last_scrape": "2025-04-01T10:55:00Z (stale: >15 minutes)",
+        },
+        "auth-service": {
+            "error_rate_pct": "N/A (scrape failed)",
+            "latency_p99_ms": "N/A (scrape failed)",
+            "_last_scrape": "2025-04-01T10:55:00Z (stale: >15 minutes)",
+        },
+    },
+    "alerts": [
+        {
+            "name": "DNSServfailHigh",
+            "severity": "P1",
+            "service": "dns-resolver",
+            "message": "SERVFAIL rate 45% (threshold: 5%)",
+            "fired_at": "2025-04-01T11:00:20Z",
+        },
+        {
+            "name": "GatewayErrorRate",
+            "severity": "P1",
+            "service": "api-gateway",
+            "message": "Error rate 60% (threshold: 5%)",
+            "fired_at": "2025-04-01T11:01:00Z",
+        },
+        {
+            "name": "MonitoringGap",
+            "severity": "P2",
+            "service": "monitoring-pipeline",
+            "message": "No metric data received for 5+ services in last 10 minutes",
+            "fired_at": "2025-04-01T11:10:00Z",
+        },
+    ],
+    "traces": {
+        "trace-net-001": {
+            "request": "GET /api/v1/orders",
+            "spans": [
+                {"service": "api-gateway", "duration_ms": 5020, "status": "DNS timeout"},
+                {"service": "dns-resolver", "duration_ms": 5000, "status": "SERVFAIL: route unreachable"},
+            ],
+            "outcome": "503 Service Unavailable: DNS resolution failed",
+        },
+    },
+}
+
+HARD_SCENARIOS: List[Dict] = [_hard_kafka_staleness_001, _hard_network_blindspot_001]
 
 
 # ----------------------------------------------------------------------

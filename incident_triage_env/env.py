@@ -1,6 +1,6 @@
 """Main RL environment for SRE incident triage."""
 
-from .grader import grade_diagnosis
+from .grader import grade_diagnosis, grade_investigation_quality
 from .models import ActionType, IncidentAction, IncidentObservation
 from .scenarios import get_scenario
 
@@ -127,7 +127,12 @@ class IncidentTriageEnv:
             )
 
         self.step_count += 1
-        self.history.append({"step": self.step_count, "action": atype, "reward": reward})
+        self.history.append({
+            "step": self.step_count,
+            "action": atype,
+            "target_service": action.target_service,
+            "reward": reward,
+        })
 
         if self.step_count >= self.max_steps and not done:
             done = True
@@ -211,12 +216,12 @@ class IncidentTriageEnv:
         key = ("query_metrics", service)
         if key in self.queried_actions:
             metrics = self.scenario.get("metrics", {}).get(service, {})
-            response = _format_metrics(service, metrics)
+            response = _format_metrics(service, metrics, self.scenario.get("blind_metrics", {}))
             return response, -0.01
 
         self.queried_actions.add(key)
         metrics = self.scenario.get("metrics", {}).get(service, {})
-        response = _format_metrics(service, metrics)
+        response = _format_metrics(service, metrics, self.scenario.get("blind_metrics", {}))
 
         causal_chain = self.scenario.get("causal_chain", [])
         reward = 0.03 if service in causal_chain else 0.0
@@ -270,27 +275,84 @@ class IncidentTriageEnv:
         fault_type: str | None,
         remediation: str | None,
     ) -> tuple[str, float, bool]:
-        result = grade_diagnosis(
+        diag_result = grade_diagnosis(
             service,
             fault_type,
             remediation,
             self.scenario["root_cause"],
             self.scenario["causal_chain"],
         )
-        score: float = result["score"]
+        diag_score: float = diag_result["score"]
 
-        if score > 0 and self.step_count <= self.max_steps / 2:
-            score = min(1.0, score + 0.05)
+        # Efficiency bonus for fast correct diagnosis
+        if diag_score > 0 and self.step_count <= self.max_steps / 2:
+            diag_score = min(1.0, diag_score + 0.05)
 
-        self.score = score
+        # Blind diagnosis penalty: penalize agents that skip investigation
+        investigation_steps = sum(
+            1 for h in self.history
+            if h["action"] in ("query_logs", "query_metrics", "trace_request",
+                               "check_alerts", "check_topology")
+        )
+        blind_penalty = 0.0
+        if investigation_steps == 0:
+            blind_penalty = 0.30
+        elif investigation_steps == 1:
+            blind_penalty = 0.15
+        elif investigation_steps == 2:
+            blind_penalty = 0.05
+
+        diag_score = max(0.0, diag_score - blind_penalty)
+
+        # Investigation quality scoring (25% weight)
+        invest_history = [
+            {"action_type": h["action"], "target_service": h.get("target_service")}
+            for h in self.history
+        ]
+        invest_result = grade_investigation_quality(
+            invest_history,
+            self.scenario["causal_chain"],
+            self.scenario["services"],
+            self.scenario["topology"],
+        )
+
+        # Combined: 75% diagnosis + 25% investigation quality (normalized)
+        # Max invest score is 0.30, so normalize: 0.30 -> 1.0
+        invest_normalized = invest_result["score"] / 0.30 if invest_result["score"] > 0 else 0.0
+        combined = (diag_score * 0.75) + (invest_normalized * 0.25)
+        combined = min(1.0, round(combined, 3))
+
+        self.score = combined
         self.done = True
-        return result["message"], score, True
+
+        message = diag_result["message"]
+        if blind_penalty > 0:
+            message += f" Investigation penalty: -{blind_penalty:.2f} ({investigation_steps} investigation steps)."
+        if invest_result["score"] > 0:
+            message += f" Investigation quality: +{invest_result['score']:.3f}."
+
+        return message, combined, True
 
 
-def _format_metrics(service: str, metrics: dict) -> str:
+def _format_metrics(service: str, metrics: dict, blind_metrics: dict | None = None) -> str:
     if not metrics:
         return f"No metrics available for {service}."
-    lines = [f"Metrics for {service}:"]
-    for key, val in metrics.items():
-        lines.append(f"  {key}: {val}")
+
+    blind = (blind_metrics or {}).get(service, {})
+    if blind:
+        last_scrape = blind.get("_last_scrape", "unknown")
+        lines = [
+            f"Metrics for {service}:",
+            f"  WARNING: some metrics may be stale (last scrape: {last_scrape})",
+        ]
+        for key, val in metrics.items():
+            if key in blind:
+                lines.append(f"  {key}: {blind[key]}")
+            else:
+                lines.append(f"  {key}: {val}")
+    else:
+        lines = [f"Metrics for {service}:"]
+        for key, val in metrics.items():
+            lines.append(f"  {key}: {val}")
+
     return "\n".join(lines)

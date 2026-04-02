@@ -27,11 +27,14 @@ This environment fills that gap. Every scenario is grounded in a documented real
 
 | Scenario Basis | What Happened | Our Mapping |
 |---|---|---|
-| **Meta 2021** | BGP route withdrawal took down all services for 6 hours | Hard: monitoring blindness, 5-service chain |
-| **AWS us-east-1 2021** | Kinesis failure cascaded into CloudWatch, then everything | Hard: independent-looking failures with single root |
-| **CrowdStrike 2024** | Bad config push crashed 8.5M machines simultaneously | Medium: config push with misleading per-service errors |
+| **Common Java OOM** | JVM heap exhaustion, container OOMKilled | Easy: clear error logs, single service |
+| **PostgreSQL disk full** | WAL logs filling disk, writes blocked | Easy: disk usage metrics, FATAL in logs |
+| **mTLS cert expiry** | Certificate renewal failed, handshakes rejected | Easy: TLS errors trace to cert-manager |
 | **GitHub Actions** | DB connection leak gradually exhausted pool | Medium: slow degradation, no error logs from leaker |
+| **CrowdStrike 2024** | Bad config push crashed 8.5M machines simultaneously | Medium: config push with misleading per-service errors |
+| **Slack 2020** | Autoscaler thundering herd overwhelmed config service | Medium: new instances can't bootstrap, config CPU 100% |
 | **ML pipeline staleness** | Kafka disk full caused silent prediction degradation | Hard: zero errors, business metric is only signal |
+| **Meta 2021** | BGP route withdrawal, monitoring also broken | Hard: monitoring blindness, stale metrics, DNS cascade |
 
 ## How It Works
 
@@ -102,9 +105,9 @@ graph LR
 
 | Task | Services | Causal Chain | Baseline Score | What Makes It Hard |
 |------|----------|-------------|---------------|-------------------|
-| easy | 3-4 | 1-2 deep | 0.88 | Single service OOM or disk-full. Logs point directly at fault. |
-| medium | 4-6 | 2-4 deep | 0.68 | Cascading failure. Requires correlating timestamps across services. |
-| hard | 6-8 | 4-5 deep | 1.00 | Zero application errors. Business metric degrades silently. |
+| easy | 3-4 | 1-2 deep | 0.88 | Single service OOM, disk-full, or cert expiry. Logs point directly at fault. |
+| medium | 4-6 | 2-4 deep | 0.68 | Cascading failure, thundering herd, config push. Timestamp correlation needed. |
+| hard | 6-8 | 4-5 deep | 0.85 | Zero application errors, monitoring blindness. Business metric is only signal. |
 
 ## Action Space
 
@@ -139,19 +142,32 @@ Six investigation actions that mirror what real SREs do:
 
 ## Scoring
 
-The grader is deterministic and produces partial credit:
+The final score combines diagnosis accuracy (75%) and investigation quality (25%):
 
 ```mermaid
 graph LR
-    subgraph Diagnosis Score
+    subgraph "Diagnosis Score (75%)"
         S["Correct service\n+0.40"] --- F["Correct fault type\n+0.35"]
         F --- R["Correct remediation\n+0.25"]
     end
-    subgraph Bonuses
-        P["Service in causal chain\n+0.15 (partial)"]
-        E["Efficiency bonus\n+0.05 (if fast)"]
+    subgraph "Investigation Quality (25%)"
+        T["Topology timing"] --- C["Chain coverage"]
+        C --- X["Cross-referencing"]
+        X --- FO["Focus ratio"]
+    end
+    subgraph "Penalties"
+        B["Blind diagnosis\n-0.30 (0 steps)\n-0.15 (1 step)\n-0.05 (2 steps)"]
     end
 ```
+
+**Investigation quality scoring** rewards agents that follow good SRE methodology:
+- Checking topology early (understanding the system)
+- Investigating services in the causal chain
+- Cross-referencing logs AND metrics for the same service
+- Staying focused on relevant services (not querying everything)
+- Following dependency links in investigation order
+
+**Blind diagnosis penalty** discourages agents from guessing without investigating. Agents that diagnose with 0 investigation steps lose 0.30 from their score.
 
 | Component | Points | Condition |
 |-----------|--------|-----------|
@@ -261,7 +277,7 @@ incident-triage-env/
 ├── incident_triage_env/
 │   ├── env.py                   # Core environment (reset/step/state)
 │   ├── grader.py                # Deterministic scoring
-│   ├── scenarios.py             # 5 scenarios across 3 difficulties
+│   ├── scenarios.py             # 8 scenarios across 3 difficulties (3+3+2)
 │   ├── real_incidents.py        # Real post-mortem mappings
 │   └── log_templates.py         # Realistic log generators (LogHub patterns)
 ├── server/

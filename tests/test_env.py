@@ -151,17 +151,21 @@ class TestRewardSignals:
             )
             assert r == 0.0
 
-    def test_perfect_diagnosis_easy(self):
+    def test_perfect_diagnosis_after_investigation(self):
         env = IncidentTriageEnv(task="easy")
         env.reset()
         gt = env.scenario["root_cause"]
+        # Investigate first (avoids blind diagnosis penalty)
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="query_logs", target_service=gt["service"]))
+        env.step(IncidentAction(action_type="query_metrics", target_service=gt["service"]))
         _, r, done, _ = env.step(IncidentAction(
             action_type="diagnose",
             target_service=gt["service"],
             fault_type=gt["fault_type"],
             remediation=gt["remediation"],
         ))
-        assert r == 1.0
+        assert r > 0.85
         assert done is True
 
     def test_wrong_diagnosis_low_score(self):
@@ -175,3 +179,24 @@ class TestRewardSignals:
         ))
         assert r == 0.0
         assert done is True
+
+
+class TestMonitoringBlindness:
+    """Hard scenarios may have stale/missing metrics."""
+
+    def test_blind_metrics_show_warning(self):
+        from incident_triage_env.scenarios import get_scenario
+        # Use hard scenario index 1 which has blind_metrics
+        env = IncidentTriageEnv(task="hard")
+        env.scenario = get_scenario("hard", 1)
+        env.step_count = 0
+        env.done = False
+        env.score = 0.0
+        env.history = []
+        env.queried_actions = set()
+        assert "blind_metrics" in env.scenario
+        blind_svc = list(env.scenario["blind_metrics"].keys())[0]
+        obs, _, _, _ = env.step(
+            IncidentAction(action_type="query_metrics", target_service=blind_svc)
+        )
+        assert "stale" in obs.response.lower() or "N/A" in obs.response or "WARNING" in obs.response
