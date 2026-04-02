@@ -103,7 +103,10 @@ def run_llm_action(client: OpenAI, messages: list[dict]) -> IncidentAction:
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
 
     data = json.loads(raw)
-    return IncidentAction(**data)
+    # Filter to known fields only -- Action base class forbids extras
+    known = {"action_type", "target_service", "fault_type", "remediation"}
+    filtered = {k: v for k, v in data.items() if k in known}
+    return IncidentAction(**filtered)
 
 
 def run_episode(task: str) -> None:
@@ -176,7 +179,7 @@ def run_episode(task: str) -> None:
 
             if not DRY_RUN:
                 # Add assistant turn (the action JSON) and next observation
-                messages.append({"role": "assistant", "content": json.dumps(action.model_dump(exclude_none=True))})
+                messages.append({"role": "assistant", "content": json.dumps(action.model_dump(exclude_none=True, exclude={"metadata"}))})
                 next_content = obs.response if obs.response else "No additional information."
                 if done:
                     break
