@@ -77,10 +77,10 @@ def print_step(step: int, action: IncidentAction, reward: float, done: bool, err
     )
 
 
-def print_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
+def print_end(success: bool, steps: int, rewards: list[float]) -> None:
     success_str = "true" if success else "false"
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={success_str} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
+    print(f"[END] success={success_str} steps={steps} rewards={rewards_str}", flush=True)
 
 
 def dry_run_actions(obs: Any) -> list[IncidentAction]:
@@ -211,7 +211,7 @@ def run_episode(task: str) -> None:
     finally:
         final_score = env.score if env else 0.0
         env.close()
-        print_end(success, steps, final_score, rewards)
+        print_end(success, steps, rewards)
 
 
 def main() -> None:
