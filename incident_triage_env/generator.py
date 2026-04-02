@@ -176,6 +176,15 @@ HARD_PATTERNS = [p for p in FAULT_PATTERNS if p.name in ("disk-full-kafka", "dns
 # Service name pools by architectural layer
 # ------------------------------------------------------------------
 
+LAYER_CRITICALITY: dict[str, int] = {
+    "gateway": 1,
+    "data": 1,
+    "infrastructure": 2,
+    "application": 2,
+    "observability": 3,
+    "ml": 3,
+}
+
 SERVICE_POOLS: dict[str, list[str]] = {
     "gateway": ["api-gateway", "edge-proxy", "load-balancer", "grpc-gateway"],
     "application": [
@@ -295,6 +304,9 @@ class ProceduralScenarioGenerator:
             "traces": traces,
             "causal_distances": causal_distances,
         }
+
+        scenario["service_criticality"] = self._compute_criticality(all_services)
+        scenario["runbooks"] = self._generate_runbooks(all_services)
 
         if difficulty == "hard":
             scenario["blind_metrics"] = self._generate_blind_metrics(all_services, causal_chain)
@@ -705,6 +717,71 @@ class ProceduralScenarioGenerator:
                 "outcome": f"Failed: {pattern.cascade_effect.replace('_', ' ')}",
             }
         }
+
+    def _compute_criticality(self, all_services: list[str]) -> dict[str, int]:
+        """Assign criticality tiers based on which service pool a service belongs to."""
+        service_to_layer: dict[str, str] = {}
+        for layer, pool in SERVICE_POOLS.items():
+            for svc in pool:
+                service_to_layer[svc] = layer
+        result: dict[str, int] = {}
+        for svc in all_services:
+            layer = service_to_layer.get(svc, "application")
+            result[svc] = LAYER_CRITICALITY.get(layer, 2)
+        return result
+
+    def _generate_runbooks(self, all_services: list[str]) -> dict[str, str]:
+        """Generate synthetic runbook text for each service based on its layer."""
+        service_to_layer: dict[str, str] = {}
+        for layer, pool in SERVICE_POOLS.items():
+            for svc in pool:
+                service_to_layer[svc] = layer
+
+        runbook_templates: dict[str, list[str]] = {
+            "gateway": [
+                "Runbook for {svc}:\n"
+                "Known issues: rate limiting misconfiguration, TLS termination failures, routing table corruption.\n"
+                "Diagnostics: check upstream health endpoints, verify TLS certificates, review routing rules.\n"
+                "Remediation: restart proxy, renew certificates, rollback routing config.",
+            ],
+            "application": [
+                "Runbook for {svc}:\n"
+                "Known issues: OOM crashes, memory leaks, thread deadlocks, high GC pressure.\n"
+                "Diagnostics: check heap usage and GC logs, review thread dumps, monitor error_rate_pct.\n"
+                "Remediation: restart service, increase heap size, kill deadlocked threads.",
+            ],
+            "data": [
+                "Runbook for {svc}:\n"
+                "Known issues: connection pool exhaustion, disk space full, replication lag, slow queries.\n"
+                "Diagnostics: check disk_usage_pct, verify connection pool settings, review WAL size.\n"
+                "Remediation: clear disk, increase connection pool, restart replication.",
+            ],
+            "infrastructure": [
+                "Runbook for {svc}:\n"
+                "Known issues: certificate expiry, DNS resolution failures, config drift, resource saturation.\n"
+                "Diagnostics: check certificate dates, test DNS resolution, verify config version against last deploy.\n"
+                "Remediation: renew certificate, flush DNS cache, rollback config, scale up.",
+            ],
+            "observability": [
+                "Runbook for {svc}:\n"
+                "Known issues: metric scrape failures, log pipeline backpressure, alert storm from noisy rules.\n"
+                "Diagnostics: check scrape targets and ingestion rate, review alert rule thresholds.\n"
+                "Remediation: restart collectors, increase pipeline buffer, silence noisy alerts.",
+            ],
+            "ml": [
+                "Runbook for {svc}:\n"
+                "Known issues: model staleness, feature pipeline delays, prediction timeouts, GPU memory exhaustion.\n"
+                "Diagnostics: check feature freshness, verify model version, monitor inference latency.\n"
+                "Remediation: retrain model, restart feature pipeline, scale inference workers.",
+            ],
+        }
+
+        result: dict[str, str] = {}
+        for svc in all_services:
+            layer = service_to_layer.get(svc, "application")
+            templates = runbook_templates.get(layer, runbook_templates["application"])
+            result[svc] = self._rng.choice(templates).format(svc=svc)
+        return result
 
     def _generate_blind_metrics(self, all_services: list[str], causal_chain: list[str]) -> dict:
         """Generate blind (stale/unavailable) metrics for hard scenarios."""

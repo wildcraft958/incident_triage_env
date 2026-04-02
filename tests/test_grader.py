@@ -228,3 +228,26 @@ class TestBlindDiagnosisPenalty:
         # Good investigation + perfect diagnosis should score high
         assert score > 0.85
         assert done is True
+
+
+class TestCriticalityScoring:
+    """Criticality tiering must affect diagnosis scoring."""
+
+    def test_tier1_wrong_diagnosis_penalized_more(self):
+        gt = {"service": "postgres-db", "fault_type": "disk_full", "remediation": "clear_disk"}
+        chain = ["postgres-db"]
+        crit_tier1 = {"postgres-db": 1}
+        crit_tier3 = {"postgres-db": 3}
+        r1 = grade_diagnosis("wrong-svc", "oom", "restart", gt, chain, service_criticality=crit_tier1)
+        r3 = grade_diagnosis("wrong-svc", "oom", "restart", gt, chain, service_criticality=crit_tier3)
+        # Tier 1 wrong diagnosis should score lower (bigger penalty)
+        assert r1["score"] <= r3["score"]
+
+    def test_tier1_correct_diagnosis_gets_bonus(self):
+        gt = {"service": "postgres-db", "fault_type": "disk_full", "remediation": "clear_disk"}
+        chain = ["postgres-db"]
+        crit = {"postgres-db": 1}
+        no_crit = None
+        r_crit = grade_diagnosis("postgres-db", "disk_full", "clear_disk", gt, chain, service_criticality=crit)
+        r_none = grade_diagnosis("postgres-db", "disk_full", "clear_disk", gt, chain, service_criticality=no_crit)
+        assert r_crit["score"] >= r_none["score"]

@@ -48,6 +48,54 @@ graph TB
     E --> H["Diagnosis + Evidence scoring\n(0.0 - 1.0, partial credit)"]
 ```
 
+Services are tagged with **criticality tiers** (Tier 1 = critical infrastructure, Tier 2 = application, Tier 3 = observability) visible in topology output. Agents can consult per-service **runbooks** listing known failure modes and standard remediation, just like real SREs.
+
+### Temporal Degradation Model
+
+Metrics degrade along sigmoid curves. Services further from the root cause start degrading later. The agent is investigating a moving target.
+
+```mermaid
+flowchart TD
+    A["Agent calls query_metrics(service)"] --> B["TemporalSimulator.compute_metrics()"]
+    B --> C{"Is service in\ncausal chain?"}
+    C -->|"No"| D["Return baseline\n(stable, healthy)"]
+    C -->|"Yes"| E["Compute effective progress"]
+    E --> F["progress = step / (max_steps * 0.75)"]
+    F --> G["onset_delay = distance * 0.20"]
+    G --> H["effective = (progress - delay) / (1 - delay)"]
+    H --> I["sigmoid = 1 / (1 + exp(-10 * (t - 0.5)))"]
+    I --> J["metric = baseline + (crisis - baseline) * sigmoid"]
+    J --> K["Return degraded metrics"]
+```
+
+### Difficulty Progression
+
+```mermaid
+flowchart LR
+    subgraph Easy["Easy"]
+        E1["3-4 services"]
+        E2["1-2 deep chain"]
+        E3["Clear error logs"]
+        E4["OOM, disk full, cert expiry"]
+    end
+
+    subgraph Medium["Medium"]
+        M1["4-6 services"]
+        M2["2-4 deep chain"]
+        M3["Red herrings + noise alerts"]
+        M4["Connection leak, config push, thundering herd"]
+    end
+
+    subgraph Hard["Hard"]
+        H1["6-9 services"]
+        H2["3-5 deep chain"]
+        H3["Monitoring blindness + stale metrics"]
+        H4["Kafka staleness, DNS failure, memory leak, deadlock"]
+    end
+
+    Easy --> Medium --> Hard
+```
+
 ## Quick Start
 
 ```bash
@@ -268,6 +316,7 @@ graph LR
 | Fault type correct | +0.35 | Only if service identified |
 | Remediation correct | +0.25 | Only if service identified |
 | Evidence bonus | up to +0.10 | Root service cited + signal keywords |
+| Criticality adjustment | +0.02 / -0.03 | Tier 1 correct gets bonus, Tier 1 wrong gets penalty |
 | Efficiency bonus | +0.05 | Diagnosed in 50% or fewer of max steps |
 
 **Valid fault types:** `oom`, `cpu_saturated`, `connection_leak`, `disk_full`, `config_error`, `network_partition`, `dependency_timeout`, `certificate_expired`, `memory_leak`, `thread_deadlock`, `dns_failure`
@@ -285,6 +334,7 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 | Check topology | +0.02 | First time only |
 | Trace request through causal chain | +0.04 | First time only |
 | Check alerts | +0.03 | First time only |
+| Check runbook of causal chain service | +0.02 | First time only |
 | Query irrelevant service | 0.00 | No penalty, no reward |
 | Repeated query (same action + service) | -0.01 | Discourages loops |
 | Invalid action | -0.02 | Missing fields, unknown type |
@@ -379,7 +429,7 @@ incident-triage-env/
 │   ├── env.py                   # Core environment (reset/step/state)
 │   ├── generator.py             # ProceduralScenarioGenerator (networkx DAG topologies)
 │   ├── temporal.py              # TemporalSimulator (sigmoid degradation, causal delays)
-│   ├── grader.py                # Deterministic scoring with evidence bonus
+│   ├── grader.py                # Deterministic scoring with evidence + criticality bonus
 │   ├── scenarios.py             # Scenario accessor (delegates to generator)
 │   ├── real_incidents.py        # Real post-mortem mappings
 │   └── log_templates.py         # Realistic log generators (LogHub patterns)
@@ -387,11 +437,11 @@ incident-triage-env/
 │   ├── app.py                   # FastAPI server (create_app)
 │   ├── incident_triage_environment.py  # OpenEnv Environment adapter
 │   └── Dockerfile               # Multi-stage build
-├── tests/                       # 148 tests
-│   ├── test_generator.py        # Generator structural validation (45 tests)
+├── tests/                       # 171 tests
+│   ├── test_generator.py        # Generator structural validation (57 tests)
 │   ├── test_temporal.py         # Temporal degradation tests (15 tests)
-│   ├── test_env.py              # Core environment tests (40 tests)
-│   ├── test_grader.py           # Grading logic tests (22 tests)
+│   ├── test_env.py              # Core environment tests (42 tests)
+│   ├── test_grader.py           # Grading logic tests (24 tests)
 │   ├── test_scenarios.py        # Scenario pool tests (16 tests)
 │   └── test_api.py              # HTTP/WS endpoint tests (10 tests)
 ├── docs/

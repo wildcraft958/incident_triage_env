@@ -13,6 +13,7 @@ _AVAILABLE_ACTIONS = [
     "check_topology()",
     "trace_request(service)",
     "check_alerts()",
+    "check_runbook(service)",
     "diagnose(service, fault_type, remediation, hypothesis_evidence)",
 ]
 
@@ -23,6 +24,7 @@ Investigate the incident by using any of these actions:
   check_topology()                             -- show service dependency graph
   trace_request(service)                       -- trace a request through the service mesh
   check_alerts()                               -- list active alerts
+  check_runbook(service)                       -- view the on-call runbook for a service
   diagnose(service, fault_type, remediation, hypothesis_evidence)
                                                -- submit your root cause analysis with evidence
 
@@ -103,7 +105,7 @@ class IncidentTriageEnv:
             info = {"error": f"unknown_action_type: {atype}"}
             return obs, -0.02, False, info
 
-        if atype in ("query_logs", "query_metrics") and action.target_service is None:
+        if atype in ("query_logs", "query_metrics", "check_runbook") and action.target_service is None:
             self.step_count += 1
             obs = self._make_obs("target_service is required for this action.")
             info = {"error": "target_service_required"}
@@ -130,6 +132,11 @@ class IncidentTriageEnv:
         elif atype == "check_alerts":
             response, reward = self._do_check_alerts()
             done = False
+        elif atype == "check_runbook":
+            response, reward = self._do_check_runbook(action.target_service)
+            done = False
+            if reward == -0.02:
+                info = {"error": f"service_not_found: {action.target_service}"}
         elif atype == "diagnose":
             response, reward, done = self._do_diagnose(
                 action.target_service, action.fault_type, action.remediation,
@@ -193,12 +200,15 @@ class IncidentTriageEnv:
 
         self.queried_actions.add(key)
         topology: dict = self.scenario.get("topology", {})
+        criticality: dict = self.scenario.get("service_criticality", {})
         lines = []
         for svc, deps in topology.items():
+            tier = criticality.get(svc, 2)
+            tier_label = f" [Tier {tier}]"
             if deps:
-                lines.append(f"{svc} -> {', '.join(deps)}")
+                lines.append(f"{svc}{tier_label} -> {', '.join(deps)}")
             else:
-                lines.append(f"{svc} -> (no dependencies)")
+                lines.append(f"{svc}{tier_label} -> (no dependencies)")
         response = "\n".join(lines) if lines else "No topology data available."
         return response, 0.02
 
@@ -287,6 +297,22 @@ class IncidentTriageEnv:
             )
         return "\n".join(lines), 0.03
 
+    def _do_check_runbook(self, service: str) -> tuple[str, float]:
+        if service not in self.scenario.get("services", []):
+            return f"Error: service '{service}' not found.", -0.02
+
+        key = ("check_runbook", service)
+        if key in self.queried_actions:
+            runbook = self.scenario.get("runbooks", {}).get(service, "No runbook available.")
+            return runbook, -0.01
+
+        self.queried_actions.add(key)
+        runbook = self.scenario.get("runbooks", {}).get(service, "No runbook available.")
+
+        causal_chain = self.scenario.get("causal_chain", [])
+        reward = 0.02 if service in causal_chain else 0.0
+        return runbook, reward
+
     def _do_diagnose(
         self,
         service: str | None,
@@ -302,6 +328,7 @@ class IncidentTriageEnv:
             self.scenario["causal_chain"],
             hypothesis_evidence=hypothesis_evidence,
             scenario=self.scenario,
+            service_criticality=self.scenario.get("service_criticality"),
         )
         diag_score: float = diag_result["score"]
 
@@ -316,7 +343,7 @@ class IncidentTriageEnv:
             (h["action"], h.get("target_service"))
             for h in self.history
             if h["action"] in ("query_logs", "query_metrics", "trace_request",
-                               "check_alerts", "check_topology")
+                               "check_alerts", "check_topology", "check_runbook")
         })
         chain_len = len(self.scenario.get("causal_chain", []))
         chain_factor = min(chain_len / 3.0, 1.5)  # 1-chain=0.33, 3-chain=1.0, 5-chain=1.5

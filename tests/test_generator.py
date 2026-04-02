@@ -221,3 +221,67 @@ class TestGeneratorScale:
             s = g.generate("hard")
             ids.add(s["id"])
         assert len(ids) >= 90
+
+
+class TestServiceCriticality:
+    """Generated scenarios must include service criticality tiering."""
+
+    @pytest.mark.parametrize("difficulty", ["easy", "medium", "hard"])
+    def test_scenario_has_service_criticality(self, difficulty):
+        gen = ProceduralScenarioGenerator(seed=42)
+        s = gen.generate(difficulty)
+        assert "service_criticality" in s
+        for svc in s["services"]:
+            assert svc in s["service_criticality"], f"Missing criticality for '{svc}'"
+
+    @pytest.mark.parametrize("difficulty", ["easy", "medium", "hard"])
+    def test_criticality_values_valid(self, difficulty):
+        gen = ProceduralScenarioGenerator(seed=42)
+        s = gen.generate(difficulty)
+        for svc, tier in s["service_criticality"].items():
+            assert tier in (1, 2, 3), f"Invalid criticality {tier} for '{svc}'"
+
+    def test_data_layer_services_are_tier1(self):
+        gen = ProceduralScenarioGenerator(seed=42)
+        s = gen.generate("easy")
+        data_services = {"postgres-db", "mysql-db", "redis-cache", "elasticsearch", "cassandra-db", "mongo-db"}
+        for svc in s["services"]:
+            if svc in data_services:
+                assert s["service_criticality"][svc] == 1, f"Data service '{svc}' should be Tier 1"
+
+    def test_observability_services_are_tier3(self):
+        gen = ProceduralScenarioGenerator(seed=42)
+        s = gen.generate("hard")
+        obs_services = {"monitoring-pipeline", "metrics-collector", "log-aggregator"}
+        for svc in s["services"]:
+            if svc in obs_services:
+                assert s["service_criticality"][svc] == 3, f"Observability service '{svc}' should be Tier 3"
+
+
+class TestRunbookGeneration:
+    """Generated scenarios must include runbooks for all services."""
+
+    @pytest.mark.parametrize("difficulty", ["easy", "medium", "hard"])
+    def test_scenario_has_runbooks(self, difficulty):
+        gen = ProceduralScenarioGenerator(seed=42)
+        s = gen.generate(difficulty)
+        assert "runbooks" in s
+        for svc in s["services"]:
+            assert svc in s["runbooks"], f"Missing runbook for '{svc}'"
+
+    @pytest.mark.parametrize("difficulty", ["easy", "medium", "hard"])
+    def test_runbooks_are_nonempty_strings(self, difficulty):
+        gen = ProceduralScenarioGenerator(seed=42)
+        s = gen.generate(difficulty)
+        for svc, text in s["runbooks"].items():
+            assert isinstance(text, str) and len(text) > 20, f"Runbook for '{svc}' too short"
+
+    def test_data_layer_runbook_mentions_connections(self):
+        gen = ProceduralScenarioGenerator(seed=42)
+        s = gen.generate("easy")
+        data_services = {"postgres-db", "mysql-db", "redis-cache", "elasticsearch", "cassandra-db", "mongo-db"}
+        for svc in s["services"]:
+            if svc in data_services:
+                text = s["runbooks"][svc].lower()
+                assert "connection" in text or "disk" in text or "replication" in text, \
+                    f"Data runbook for '{svc}' should mention data-layer concerns"

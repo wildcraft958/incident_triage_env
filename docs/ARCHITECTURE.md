@@ -219,7 +219,7 @@ flowchart LR
 | `incident_triage_env/env.py` | Core environment with reset/step/state | Integrates generator + temporal simulator |
 | `incident_triage_env/generator.py` | Procedural scenario generation | networkx DAGs, 10 fault patterns, 40+ service names |
 | `incident_triage_env/temporal.py` | Dynamic metric degradation | Sigmoid curves, causal hop delays |
-| `incident_triage_env/grader.py` | Diagnosis + evidence + investigation scoring | Deterministic, range [0.0, 1.0], partial credit |
+| `incident_triage_env/grader.py` | Diagnosis + evidence + criticality + investigation scoring | Deterministic, range [0.0, 1.0], partial credit |
 | `incident_triage_env/scenarios.py` | Scenario accessor (delegates to generator) | Backward compat pool lists |
 | `incident_triage_env/log_templates.py` | Realistic log generators from LogHub | Timestamps, thread IDs, stack traces |
 | `incident_triage_env/real_incidents.py` | Maps real outages to fault patterns | Reference data for pattern design |

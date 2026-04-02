@@ -50,6 +50,12 @@ action_space:
     - name: check_alerts
       description: View active alerts and alert history
       parameters: []
+    - name: check_runbook
+      description: View the on-call runbook for a specific service (known issues, diagnostics, remediation)
+      parameters:
+        - name: target_service
+          type: string
+          required: true
     - name: diagnose
       description: Submit a root-cause diagnosis with supporting evidence
       parameters:

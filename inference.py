@@ -23,6 +23,7 @@ You have access to these actions (respond with JSON only):
 - {"action_type": "check_topology"}
 - {"action_type": "trace_request", "target_service": "<name>"}
 - {"action_type": "check_alerts"}
+- {"action_type": "check_runbook", "target_service": "<name>"}
 - {"action_type": "diagnose", "target_service": "<name>", "fault_type": "<type>", "remediation": "<fix>", "hypothesis_evidence": "<cite specific log lines or metric values>"}
 
 Valid fault types: oom, cpu_saturated, connection_leak, disk_full, config_error, network_partition, dependency_timeout, certificate_expired, memory_leak, thread_deadlock, dns_failure
@@ -38,8 +39,9 @@ Strategy:
 1. Check topology first to understand service dependencies.
 2. Query logs and metrics of services closest to the reported alert.
 3. Follow the dependency chain toward infrastructure (databases, message brokers, config services).
-4. If metrics look normal, the root cause may be deeper in the chain. Keep investigating.
-5. When diagnosing, include hypothesis_evidence citing specific log lines or metric values.
+4. Check runbooks for services you suspect -- they list known failure modes and remediation steps.
+5. If metrics look normal, the root cause may be deeper in the chain. Keep investigating.
+6. When diagnosing, include hypothesis_evidence citing specific log lines or metric values.
 
 Respond with ONLY valid JSON, no explanation."""
 
@@ -51,7 +53,7 @@ def format_action_str(action: IncidentAction) -> str:
         return "check_topology()"
     if atype == "check_alerts":
         return "check_alerts()"
-    if atype in ("query_logs", "query_metrics", "trace_request"):
+    if atype in ("query_logs", "query_metrics", "trace_request", "check_runbook"):
         svc = action.target_service or ""
         return f"{atype}({svc})"
     if atype == "diagnose":

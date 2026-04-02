@@ -48,6 +48,7 @@ You have access to these actions (respond with JSON only):
 - {"action_type": "check_topology"}
 - {"action_type": "trace_request", "target_service": "<name>"}
 - {"action_type": "check_alerts"}
+- {"action_type": "check_runbook", "target_service": "<name>"}
 - {"action_type": "diagnose", "target_service": "<name>", "fault_type": "<type>", "remediation": "<fix>", "hypothesis_evidence": "<cite specific log lines or metric values>"}
 
 Valid fault types: oom, cpu_saturated, connection_leak, disk_full, config_error, network_partition, dependency_timeout, certificate_expired, memory_leak, thread_deadlock, dns_failure

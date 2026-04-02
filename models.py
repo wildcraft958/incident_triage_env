@@ -13,6 +13,7 @@ class ActionType(str, Enum):
     check_topology = "check_topology"
     trace_request = "trace_request"
     check_alerts = "check_alerts"
+    check_runbook = "check_runbook"
     diagnose = "diagnose"
 
 

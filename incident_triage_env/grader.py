@@ -24,6 +24,7 @@ def grade_diagnosis(
     causal_chain: list[str],
     hypothesis_evidence: str | None = None,
     scenario: dict | None = None,
+    service_criticality: dict | None = None,
 ) -> dict:
     """Grade a submitted diagnosis against the ground truth.
 
@@ -45,15 +46,20 @@ def grade_diagnosis(
 
     base_score = service_correct + service_partial + fault_correct + remediation_correct
 
+    criticality_adj = _criticality_adjustment(
+        service_correct > 0, service_identified, gt_service, service_criticality
+    )
+
     evidence_bonus = _score_evidence(hypothesis_evidence, gt_service, gt_fault, scenario)
 
-    score = min(1.0, max(0.0, base_score + evidence_bonus))
+    score = min(1.0, max(0.0, base_score + criticality_adj + evidence_bonus))
 
     breakdown = {
         "service_correct": service_correct,
         "service_partial": service_partial,
         "fault_correct": fault_correct,
         "remediation_correct": remediation_correct,
+        "criticality_adjustment": criticality_adj,
         "evidence_bonus": evidence_bonus,
     }
 
@@ -76,6 +82,30 @@ def grade_diagnosis(
         message = "Partial credit: " + ", ".join(parts) + "."
 
     return {"score": score, "breakdown": breakdown, "message": message}
+
+
+def _criticality_adjustment(
+    service_exact: bool,
+    service_identified: bool,
+    root_service: str,
+    service_criticality: dict | None,
+) -> float:
+    """Small scoring adjustment based on root cause service criticality.
+
+    Tier 1 (critical) correct diagnosis: +0.02 bonus
+    Tier 1 wrong diagnosis: -0.03 penalty
+    Tier 2: no adjustment
+    Tier 3: no adjustment
+    """
+    if not service_criticality:
+        return 0.0
+    tier = service_criticality.get(root_service, 2)
+    if tier == 1:
+        if service_exact:
+            return 0.02
+        if not service_identified:
+            return -0.03
+    return 0.0
 
 
 def _score_evidence(

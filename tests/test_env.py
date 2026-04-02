@@ -411,3 +411,61 @@ class TestHypothesisEvidence:
         ))
 
         assert score_with >= score_without
+
+
+class TestTopologyCriticality:
+    """Topology output must show service criticality tiers."""
+
+    def test_topology_shows_tier_labels(self):
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        obs, _, _, _ = env.step(IncidentAction(action_type="check_topology"))
+        assert "Tier" in obs.response
+
+
+class TestCheckRunbook:
+    """check_runbook action must return runbook content."""
+
+    def setup_method(self):
+        self.env = IncidentTriageEnv(task="easy")
+        self.env.reset()
+
+    def test_check_runbook_valid_service(self):
+        svc = self.env.scenario["services"][0]
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="check_runbook", target_service=svc)
+        )
+        assert obs.response != ""
+        assert len(obs.response) > 20
+        assert done is False
+        assert r >= 0
+
+    def test_check_runbook_invalid_service(self):
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="check_runbook", target_service="nonexistent-svc")
+        )
+        assert "error" in obs.response.lower() or "not found" in obs.response.lower()
+        assert r == -0.02
+        assert info.get("error") is not None
+
+    def test_check_runbook_duplicate_penalized(self):
+        svc = self.env.scenario["services"][0]
+        self.env.step(IncidentAction(action_type="check_runbook", target_service=svc))
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="check_runbook", target_service=svc)
+        )
+        assert r == -0.01
+
+    def test_check_runbook_causal_service_gives_reward(self):
+        root = self.env.scenario["root_cause"]["service"]
+        _, r, _, _ = self.env.step(
+            IncidentAction(action_type="check_runbook", target_service=root)
+        )
+        assert r == 0.02
+
+    def test_check_runbook_missing_target_service(self):
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="check_runbook")
+        )
+        assert info.get("error") is not None
+        assert r == -0.02
