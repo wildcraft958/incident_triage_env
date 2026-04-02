@@ -9,6 +9,8 @@ Incidents are grounded in real post-mortems tracked in real_incidents.py.
 import random
 from typing import Dict, List
 
+from .generator import ProceduralScenarioGenerator
+
 
 # ----------------------------------------------------------------------
 # EASY SCENARIOS
@@ -368,7 +370,8 @@ _easy_cert_001: Dict = {
     },
 }
 
-EASY_SCENARIOS: List[Dict] = [_easy_oom_001, _easy_disk_001, _easy_cert_001]
+# Static scenarios kept as reference data (not used at runtime)
+_STATIC_EASY: List[Dict] = [_easy_oom_001, _easy_disk_001, _easy_cert_001]
 
 
 # ----------------------------------------------------------------------
@@ -845,7 +848,7 @@ _medium_thunderherd_001: Dict = {
     },
 }
 
-MEDIUM_SCENARIOS: List[Dict] = [_medium_connleak_001, _medium_config_001, _medium_thunderherd_001]
+_STATIC_MEDIUM: List[Dict] = [_medium_connleak_001, _medium_config_001, _medium_thunderherd_001]
 
 
 # ----------------------------------------------------------------------
@@ -1259,28 +1262,40 @@ _hard_network_blindspot_001: Dict = {
     },
 }
 
-HARD_SCENARIOS: List[Dict] = [_hard_kafka_staleness_001, _hard_network_blindspot_001]
+EASY_SCENARIOS: List[Dict] = [
+    ProceduralScenarioGenerator(seed=i).generate("easy") for i in range(3)
+]
+MEDIUM_SCENARIOS: List[Dict] = [
+    ProceduralScenarioGenerator(seed=100 + i).generate("medium") for i in range(3)
+]
+HARD_SCENARIOS: List[Dict] = [
+    ProceduralScenarioGenerator(seed=200 + i).generate("hard") for i in range(2)
+]
 
 
 # ----------------------------------------------------------------------
-# Scenario accessor
+# Procedural generation (primary engine)
 # ----------------------------------------------------------------------
+
+_runtime_generator = ProceduralScenarioGenerator()
+
 
 def get_scenario(task: str, index: int | None = None) -> dict:
-    """Return a scenario dict by difficulty task and optional index.
+    """Generate a scenario for the given difficulty.
+
+    When index is None, generates a fresh random scenario each call.
+    When index is given, uses a deterministic seed for reproducibility.
 
     Args:
         task: One of "easy", "medium", or "hard".
-        index: Which scenario in the pool to return. Wraps around if out of range.
-               When None, a scenario is chosen randomly.
+        index: Optional seed modifier for deterministic generation.
 
     Raises:
         ValueError: If task is not a known difficulty level.
     """
-    pools = {"easy": EASY_SCENARIOS, "medium": MEDIUM_SCENARIOS, "hard": HARD_SCENARIOS}
-    if task not in pools:
+    if task not in ("easy", "medium", "hard"):
         raise ValueError(f"Unknown task '{task}'. Must be one of: easy, medium, hard")
-    pool = pools[task]
-    if index is None:
-        return random.choice(pool)
-    return pool[index % len(pool)]
+    if index is not None:
+        gen = ProceduralScenarioGenerator(seed=index * 1000 + hash(task) % 10000)
+        return gen.generate(task)
+    return _runtime_generator.generate(task)

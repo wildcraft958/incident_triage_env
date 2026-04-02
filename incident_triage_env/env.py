@@ -1,8 +1,9 @@
 """Main RL environment for SRE incident triage."""
 
+from .generator import ProceduralScenarioGenerator
 from .grader import grade_diagnosis, grade_investigation_quality
 from .models import ActionType, IncidentAction, IncidentObservation
-from .scenarios import get_scenario
+from .temporal import TemporalSimulator
 
 _VALID_ACTION_TYPES = {a.value for a in ActionType}
 
@@ -12,17 +13,18 @@ _AVAILABLE_ACTIONS = [
     "check_topology()",
     "trace_request(service)",
     "check_alerts()",
-    "diagnose(service, fault_type, remediation)",
+    "diagnose(service, fault_type, remediation, hypothesis_evidence)",
 ]
 
 _ACTION_GUIDE = """\
 Investigate the incident by using any of these actions:
-  query_logs(service)                          — fetch recent logs for a service
-  query_metrics(service)                       — fetch CPU, memory, error rate metrics
-  check_topology()                             — show service dependency graph
-  trace_request(service)                       — trace a request through the service mesh
-  check_alerts()                               — list active alerts
-  diagnose(service, fault_type, remediation)   — submit your root cause analysis
+  query_logs(service)                          -- fetch recent logs for a service
+  query_metrics(service)                       -- fetch CPU, memory, error rate metrics
+  check_topology()                             -- show service dependency graph
+  trace_request(service)                       -- trace a request through the service mesh
+  check_alerts()                               -- list active alerts
+  diagnose(service, fault_type, remediation, hypothesis_evidence)
+                                               -- submit your root cause analysis with evidence
 
 Valid fault_type values: oom, cpu_saturated, connection_leak, disk_full, config_error, \
 network_partition, dependency_timeout, certificate_expired, memory_leak, thread_deadlock, dns_failure
@@ -44,6 +46,8 @@ class IncidentTriageEnv:
         self.task = task
         self.max_steps = max_steps
 
+        self._generator = ProceduralScenarioGenerator()
+        self._temporal: TemporalSimulator | None = None
         self.scenario: dict = {}
         self.step_count: int = 0
         self.done: bool = False
@@ -52,12 +56,15 @@ class IncidentTriageEnv:
         self.queried_actions: set[tuple] = set()
 
     def reset(self) -> IncidentObservation:
-        """Load a fresh scenario and reset all episode state.
+        """Generate a fresh scenario and reset all episode state.
 
         Raises:
             ValueError: If self.task is not a recognised difficulty level.
         """
-        self.scenario = get_scenario(self.task)
+        if self.task not in ("easy", "medium", "hard"):
+            raise ValueError(f"Unknown task '{self.task}'. Must be one of: easy, medium, hard")
+        self.scenario = self._generator.generate(self.task)
+        self._temporal = TemporalSimulator(self.scenario, self.max_steps)
         self.step_count = 0
         self.done = False
         self.score = 0.0
@@ -125,7 +132,8 @@ class IncidentTriageEnv:
             done = False
         elif atype == "diagnose":
             response, reward, done = self._do_diagnose(
-                action.target_service, action.fault_type, action.remediation
+                action.target_service, action.fault_type, action.remediation,
+                action.hypothesis_evidence,
             )
 
         self.step_count += 1
@@ -200,11 +208,11 @@ class IncidentTriageEnv:
 
         key = ("query_logs", service)
         if key in self.queried_actions:
-            logs = self.scenario.get("logs", {}).get(service, [])[-max_lines:]
+            logs = self._temporal.compute_logs(service, self.step_count)[-max_lines:]
             return "\n".join(logs) if logs else f"No logs for {service}.", -0.01
 
         self.queried_actions.add(key)
-        logs = self.scenario.get("logs", {}).get(service, [])[-max_lines:]
+        logs = self._temporal.compute_logs(service, self.step_count)[-max_lines:]
         response = "\n".join(logs) if logs else f"No logs available for {service}."
 
         causal_chain = self.scenario.get("causal_chain", [])
@@ -217,12 +225,12 @@ class IncidentTriageEnv:
 
         key = ("query_metrics", service)
         if key in self.queried_actions:
-            metrics = self.scenario.get("metrics", {}).get(service, {})
+            metrics = self._temporal.compute_metrics(service, self.step_count)
             response = _format_metrics(service, metrics, self.scenario.get("blind_metrics", {}))
             return response, -0.01
 
         self.queried_actions.add(key)
-        metrics = self.scenario.get("metrics", {}).get(service, {})
+        metrics = self._temporal.compute_metrics(service, self.step_count)
         response = _format_metrics(service, metrics, self.scenario.get("blind_metrics", {}))
 
         causal_chain = self.scenario.get("causal_chain", [])
@@ -238,7 +246,7 @@ class IncidentTriageEnv:
             return "Trace already retrieved for this target.", -0.01
 
         self.queried_actions.add(key)
-        traces: dict = self.scenario.get("traces", {})
+        traces: dict = self._temporal.compute_traces(self.step_count)
 
         if traces:
             lines = []
@@ -267,7 +275,7 @@ class IncidentTriageEnv:
             return "Alerts already retrieved.", -0.01
 
         self.queried_actions.add(key)
-        alerts: list[dict] = self.scenario.get("alerts", [])
+        alerts: list[dict] = self._temporal.compute_alerts(self.step_count)
         if not alerts:
             return "No active alerts.", 0.03
 
@@ -284,6 +292,7 @@ class IncidentTriageEnv:
         service: str | None,
         fault_type: str | None,
         remediation: str | None,
+        hypothesis_evidence: str | None = None,
     ) -> tuple[str, float, bool]:
         diag_result = grade_diagnosis(
             service,
@@ -291,6 +300,8 @@ class IncidentTriageEnv:
             remediation,
             self.scenario["root_cause"],
             self.scenario["causal_chain"],
+            hypothesis_evidence=hypothesis_evidence,
+            scenario=self.scenario,
         )
         diag_score: float = diag_result["score"]
 

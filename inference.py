@@ -23,13 +23,14 @@ You have access to these actions (respond with JSON only):
 - {"action_type": "check_topology"}
 - {"action_type": "trace_request", "target_service": "<name>"}
 - {"action_type": "check_alerts"}
-- {"action_type": "diagnose", "target_service": "<name>", "fault_type": "<type>", "remediation": "<fix>"}
+- {"action_type": "diagnose", "target_service": "<name>", "fault_type": "<type>", "remediation": "<fix>", "hypothesis_evidence": "<cite specific log lines or metric values>"}
 
 Valid fault types: oom, cpu_saturated, connection_leak, disk_full, config_error, network_partition, dependency_timeout, certificate_expired, memory_leak, thread_deadlock, dns_failure
 Valid remediations: restart, scale_up, fix_config, clear_disk, rollback, failover, increase_pool, renew_certificate, kill_threads, flush_dns, update_routes, resize_volume
 
 Investigate methodically. Query logs and metrics of suspicious services before diagnosing.
 When ready to diagnose, submit the diagnose action with your best assessment.
+Include hypothesis_evidence citing specific log timestamps or metric values that led to your conclusion.
 Respond with ONLY valid JSON, no explanation."""
 
 
@@ -47,7 +48,8 @@ def format_action_str(action: IncidentAction) -> str:
         svc = action.target_service or ""
         ft = action.fault_type or ""
         rem = action.remediation or ""
-        return f"diagnose({svc},{ft},{rem})"
+        ev = action.hypothesis_evidence or ""
+        return f"diagnose({svc},{ft},{rem},{ev[:50]})"
     return f"{atype}()"
 
 
@@ -83,6 +85,7 @@ def dry_run_actions(obs: Any) -> list[IncidentAction]:
             target_service=first_service,
             fault_type="disk_full",
             remediation="rollback",
+            hypothesis_evidence="CPU at 99%, error_rate 100%",
         ),
     ]
 
@@ -110,7 +113,7 @@ def run_llm_action(client: OpenAI, messages: list[dict]) -> IncidentAction:
 
     data = json.loads(raw)
     # Filter to known fields only -- Action base class forbids extras
-    known = {"action_type", "target_service", "fault_type", "remediation"}
+    known = {"action_type", "target_service", "fault_type", "remediation", "hypothesis_evidence"}
     filtered = {k: v for k, v in data.items() if k in known}
     return IncidentAction(**filtered)
 
