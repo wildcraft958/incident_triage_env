@@ -118,6 +118,8 @@ class IncidentTriageEnv:
         elif atype == "trace_request":
             response, reward = self._do_trace_request(action.target_service)
             done = False
+            if reward == -0.02:
+                info = {"error": f"service_not_found: {action.target_service}"}
         elif atype == "check_alerts":
             response, reward = self._do_check_alerts()
             done = False
@@ -228,6 +230,9 @@ class IncidentTriageEnv:
         return response, reward
 
     def _do_trace_request(self, service: str | None) -> tuple[str, float]:
+        if service is not None and service not in self.scenario.get("services", []):
+            return f"Error: service '{service}' not found.", -0.02
+
         key = ("trace_request", service)
         if key in self.queried_actions:
             return "Trace already retrieved for this target.", -0.01
@@ -238,12 +243,17 @@ class IncidentTriageEnv:
         if traces:
             lines = []
             for tid, trace in traces.items():
+                spans = trace.get("spans", [])
+                if service is not None:
+                    spans = [s for s in spans if s["service"] == service]
+                if service is not None and not spans:
+                    continue
                 lines.append(f"Trace {tid}: {trace.get('request', '')} -> {trace.get('outcome', '')}")
-                for span in trace.get("spans", []):
+                for span in spans:
                     lines.append(
                         f"  {span['service']}: {span['duration_ms']}ms [{span['status']}]"
                     )
-            response = "\n".join(lines)
+            response = "\n".join(lines) if lines else f"No traces found for {service}."
         else:
             response = f"No traces available{' for ' + service if service else ''}."
 

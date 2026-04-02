@@ -200,3 +200,60 @@ class TestMonitoringBlindness:
             IncidentAction(action_type="query_metrics", target_service=blind_svc)
         )
         assert "stale" in obs.response.lower() or "N/A" in obs.response or "WARNING" in obs.response
+
+
+class TestTraceRequest:
+    """trace_request must filter by service or return all traces."""
+
+    def setup_method(self):
+        self.env = IncidentTriageEnv(task="easy")
+        self.env.reset()
+
+    def test_trace_request_no_service_returns_all(self):
+        obs, r, done, info = self.env.step(IncidentAction(action_type="trace_request"))
+        assert obs.response != ""
+        assert "not found" not in obs.response.lower()
+        assert done is False
+        # All services should appear across the spans
+        services = self.env.scenario["services"]
+        assert any(svc in obs.response for svc in services)
+
+    def test_trace_request_valid_service_filters_spans(self):
+        services = self.env.scenario["services"]
+        target = services[0]
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="trace_request", target_service=target)
+        )
+        assert obs.response != ""
+        assert done is False
+        # Every span line must belong to the target service
+        for line in obs.response.splitlines():
+            if line.startswith("  "):
+                assert line.strip().startswith(target), (
+                    f"Expected span for '{target}' but got: {line}"
+                )
+
+    def test_trace_request_invalid_service_returns_error(self):
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="trace_request", target_service="nonexistent-svc")
+        )
+        assert r == -0.02
+        assert "error" in obs.response.lower() or "not found" in obs.response.lower()
+        assert info.get("error") is not None
+        assert done is False
+
+    def test_trace_request_causal_service_gives_reward(self):
+        causal_chain = self.env.scenario["causal_chain"]
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="trace_request", target_service=causal_chain[0])
+        )
+        assert r == 0.04
+
+    def test_trace_request_duplicate_penalized(self):
+        services = self.env.scenario["services"]
+        target = services[0]
+        self.env.step(IncidentAction(action_type="trace_request", target_service=target))
+        obs, r, done, info = self.env.step(
+            IncidentAction(action_type="trace_request", target_service=target)
+        )
+        assert r == -0.01
