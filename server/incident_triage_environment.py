@@ -1,31 +1,31 @@
 """
-Incident Triage Environment implementation.
+Incident Triage Environment -- openenv Environment adapter.
 
-Wraps IncidentTriageEnv (stateful episode logic) in the openenv Environment interface.
-The HTTP server (server/app.py) manages session state across requests; this class
-handles a single episode's reset/step lifecycle.
+Wraps IncidentTriageEnv in the standard Environment interface so create_app()
+can serve it over HTTP and WebSocket.
 """
 
-from typing import Optional
+from typing import Any, Optional
 from uuid import uuid4
 
-from openenv.core.env_server.interfaces import Environment
+from openenv.core.env_server.interfaces import Environment, EnvironmentMetadata
 from openenv.core.env_server.types import State
 
 try:
     from ..models import IncidentAction, IncidentObservation
-    from ..incident_triage_env.env import IncidentTriageEnv
 except ImportError:
     from models import IncidentAction, IncidentObservation
-    from incident_triage_env.env import IncidentTriageEnv
+
+from incident_triage_env.env import IncidentTriageEnv
+from incident_triage_env.models import IncidentAction as _InternalAction
 
 
 class IncidentTriageEnvironment(Environment):
     """
-    Single-episode adapter around IncidentTriageEnv.
+    Adapter that wraps IncidentTriageEnv for the openenv server.
 
-    The HTTP server in app.py manages sessions (one env per session_id).
-    This class exposes the openenv Environment interface for tooling compatibility.
+    WebSocket connections get one instance per session, so state is
+    preserved across reset/step calls within the same connection.
     """
 
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
@@ -40,7 +40,7 @@ class IncidentTriageEnvironment(Environment):
         seed: Optional[int] = None,
         episode_id: Optional[str] = None,
         task: str = "easy",
-        **kwargs,
+        **kwargs: Any,
     ) -> IncidentObservation:
         self._inner = IncidentTriageEnv(task=task)
         inner_obs = self._inner.reset()
@@ -64,13 +64,10 @@ class IncidentTriageEnvironment(Environment):
         self,
         action: IncidentAction,
         timeout_s: Optional[float] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> IncidentObservation:
         if self._inner is None:
             raise RuntimeError("Call reset() before step()")
-
-        inner_action_cls = self._inner.scenario  # just to import the internal model
-        from incident_triage_env.models import IncidentAction as _InternalAction
 
         inner_action = _InternalAction(
             action_type=action.action_type,
@@ -95,3 +92,14 @@ class IncidentTriageEnvironment(Environment):
     @property
     def state(self) -> State:
         return self._state
+
+    def get_metadata(self) -> EnvironmentMetadata:
+        return EnvironmentMetadata(
+            name="incident-triage-env",
+            description=(
+                "SRE incident triage RL environment. Agents investigate production "
+                "incidents by querying logs, metrics, topology, traces, and alerts "
+                "across microservices, then submit a root-cause diagnosis."
+            ),
+            version="1.0.0",
+        )
