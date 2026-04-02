@@ -5,16 +5,31 @@ Exposes reset/step/state HTTP endpoints for agent interaction,
 plus /metadata, /schema, and /mcp endpoints required by openenv validate.
 """
 
+import logging
+import time
 import uuid
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from incident_triage_env.env import IncidentTriageEnv
+from incident_triage_env.logger import EpisodeLogger
 from incident_triage_env.models import IncidentAction, IncidentObservation
+
+# ---------------------------------------------------------------------------
+# Logging setup -- structured lines go to stdout so the HF Space log viewer
+# and any external collector can consume them without extra config.
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%SZ",
+)
+log = logging.getLogger("incident_triage.server")
 
 app = FastAPI(title="Incident Triage Environment", version="1.0.0")
 
+# session_id -> {"env": IncidentTriageEnv, "episode_logger": EpisodeLogger}
 _sessions: dict = {}
 _VALID_TASKS = {"easy", "medium", "hard"}
 
@@ -24,6 +39,29 @@ _TASK_DESCRIPTIONS = [
     {"name": "hard", "description": "Complex cascading failure across 5+ services with no direct error signals. Temporal reasoning and trace analysis required."},
 ]
 
+
+# ---------------------------------------------------------------------------
+# Request logging middleware
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next) -> Response:
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    log.info(
+        "http method=%s path=%s status=%d duration_ms=%.1f",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Request / response models
+# ---------------------------------------------------------------------------
 
 class ResetRequest(BaseModel):
     task: str
@@ -38,6 +76,10 @@ class StepRequest(BaseModel):
 class StateRequest(BaseModel):
     session_id: str
 
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 
 @app.get("/")
 def root() -> dict:
@@ -110,33 +152,53 @@ def reset(req: ResetRequest) -> dict:
 
     if len(_sessions) > 200:
         oldest = next(iter(_sessions))
-        del _sessions[oldest]
+        old = _sessions.pop(oldest)
+        # Flush the episode log for the evicted session if it's still open.
+        el: EpisodeLogger = old.get("episode_logger")
+        if el is not None:
+            el._flush()
+        log.info("evicted_session session=%s", oldest)
 
     env = IncidentTriageEnv(task=req.task)
     obs = env.reset()
     session_id = str(uuid.uuid4())
-    _sessions[session_id] = env
 
+    el = EpisodeLogger(session_id, req.task)
+    el.__enter__()
+    el.log_reset(obs)
+
+    _sessions[session_id] = {"env": env, "episode_logger": el}
+
+    log.info("reset session=%s task=%s scenario=%s", session_id, req.task, obs.incident_id)
     return {"session_id": session_id, "observation": obs.model_dump()}
 
 
 @app.post("/step")
 def step(req: StepRequest) -> dict:
-    env = _sessions.get(req.session_id)
-    if env is None:
+    session = _sessions.get(req.session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail=f"Session not found: {req.session_id!r}")
 
+    env: IncidentTriageEnv = session["env"]
+    el: EpisodeLogger = session["episode_logger"]
+
     obs, reward, done, info = env.step(req.action)
+    el.log_step(req.action, obs, reward, done)
+
+    if done:
+        el.__exit__(None, None, None)
+        session["episode_logger"] = None
+
     return {"observation": obs.model_dump(), "reward": reward, "done": done, "info": info}
 
 
 @app.post("/state")
 def state(req: StateRequest) -> dict:
-    env = _sessions.get(req.session_id)
-    if env is None:
+    session = _sessions.get(req.session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail=f"Session not found: {req.session_id!r}")
 
-    return env.state()
+    return session["env"].state()
 
 
 def main(host: str = "0.0.0.0", port: int = 7860) -> None:
