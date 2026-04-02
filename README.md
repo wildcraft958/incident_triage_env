@@ -452,6 +452,36 @@ incident-triage-env/
     └── deploy_hf.sh             # Deploy to HuggingFace Spaces
 ```
 
+## Future Scope
+
+The current environment is a deterministic mathematical simulation optimized for the 2 vCPU / 8GB RAM evaluation constraint. Below are architecturally validated extensions that would push this toward a research-grade benchmark.
+
+### Live Container Orchestration
+
+Replace text-based metric generation with actual Docker containers. The procedural generator would emit a `docker-compose.yml` instead of a Python dict. Fault injection becomes real: `dd if=/dev/zero` for disk_full, `tc qdisc` for network latency, `stress-ng` for CPU saturation. The agent's action space shifts from `query_metrics("service")` to `execute_bash("service", "df -h")`. This bridges the gap between simulating symptoms and executing diagnostics, following the approach of OSWorld and SWE-bench.
+
+### Adversarial Chaos Agent
+
+Transform the environment into a two-player Markov game. While the SRE agent investigates, a background Chaos Agent injects new faults in response to the agent's progress. If the agent focuses on the database, the Chaos Agent kills the API gateway. This forces the agent to handle concurrent alerts and prioritize under active sabotage, similar to Netflix's Chaos Monkey but as an RL adversary. The temporal simulator's passive sigmoid degradation becomes active and adversarial.
+
+### Post-Diagnosis Verification Phase
+
+Currently, `diagnose` ends the episode. In V2, the episode continues: the agent must monitor the system for N subsequent steps to verify metrics return to baseline. If the agent restarts a service but the memory leak recurs 3 steps later (because the root fix was a config patch, not a restart), the episode fails. This tests whether agents understand the difference between symptom relief and root cause resolution.
+
+### Nested Remediation Environments
+
+After correct diagnosis, drop the agent into a nested sub-environment where it must execute the actual fix. For `config_error`, the agent edits a YAML file. For `certificate_expired`, it runs `certbot renew`. The grader evaluates the exit code and post-fix system state rather than string-matching a remediation label. This extends the action space from discrete choices to freeform command execution.
+
+### Multi-Agent Delegation
+
+Split the action space across specialized roles: a Logs Specialist (can only `query_logs`), a Metrics Specialist (can only `query_metrics`), and a Lead SRE that coordinates by sending natural language requests. The grader penalizes excessive communication overhead, forcing precise delegation. This evaluates team orchestration rather than individual reasoning, following the MetaGPT/ChatDev paradigm.
+
+### Compliance Constraints
+
+Add regulatory boundaries. Tier 1 services (databases with PII) require the agent to check a runbook and log an audit trail before querying. Querying a restricted service without authorization terminates the episode with score 0. This tests whether agents can operate under compliance constraints while maintaining diagnostic speed.
+
+These extensions are not viable under the current hackathon's 8GB/20-minute constraints but represent a clear path toward a publishable benchmark for autonomous SRE agents.
+
 ## Real-World Sources
 
 All fault patterns are grounded in documented production incidents:
