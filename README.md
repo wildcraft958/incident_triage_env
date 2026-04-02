@@ -1,3 +1,13 @@
+---
+title: Incident Triage Environment
+emoji: 🚨
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+base_path: /web
+---
+
 # Incident Triage Environment
 
 An RL environment where AI agents learn to diagnose production incidents across microservices.
@@ -131,7 +141,7 @@ Valid remediations: `restart`, `scale_up`, `fix_config`, `clear_disk`, `rollback
 
 ## Baseline Results
 
-Results from running `Qwen/Qwen2.5-72B-Instruct` via HuggingFace router:
+Results from running `Qwen/Qwen3.5-27B` via HuggingFace router:
 
 | Task | Score | Steps |
 |------|-------|-------|
@@ -150,7 +160,7 @@ bash scripts/run_baseline.sh
 
 ```bash
 export API_BASE_URL=https://router.huggingface.co/v1
-export MODEL_NAME=Qwen/Qwen2.5-72B-Instruct
+export MODEL_NAME=Qwen/Qwen3.5-27B
 export HF_TOKEN=hf_your_token
 python inference.py
 ```

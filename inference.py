@@ -11,7 +11,7 @@ from incident_triage_env.env import IncidentTriageEnv
 from incident_triage_env.models import IncidentAction
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-27B")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or ""
 DRY_RUN = os.getenv("INFERENCE_DRY_RUN", "0") == "1"
 
