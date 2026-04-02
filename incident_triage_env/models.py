@@ -58,10 +58,7 @@ class IncidentAction(BaseModel):
     @field_validator("action_type")
     @classmethod
     def validate_action_type(cls, v: str) -> str:
-        """Reject any action_type not in the ActionType enum."""
-        valid = {a.value for a in ActionType}
-        if v not in valid:
-            raise ValueError(f"action_type must be one of {sorted(valid)}, got {v!r}")
+        """Accept any action_type string; env.step() rejects unknown values at runtime."""
         return v
 
 
@@ -71,6 +68,7 @@ class IncidentObservation(BaseModel):
     incident_id: str
     summary: str
     available_services: list[str]
+    available_actions: list[str] = []
     response: str = ""
     step: int = 0
     done: bool = False

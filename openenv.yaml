@@ -1,5 +1,11 @@
+spec_version: 1
 name: incident-triage-env
-version: "1.0"
+type: space
+runtime: fastapi
+app: server.app:app
+port: 7860
+
+version: "1.0.0"
 description: >
   SRE Incident Triage RL Environment. An AI agent investigates microservice
   incidents by querying logs, metrics, topology, traces, and alerts, then
@@ -91,6 +97,8 @@ observation_space:
       type: string
     - name: available_services
       type: list[string]
+    - name: available_actions
+      type: list[string]
     - name: response
       type: string
     - name: step
@@ -102,25 +110,3 @@ observation_space:
 
 reward_range: [0.0, 1.0]
 max_steps: 15
-
-api:
-  base_url: http://localhost:7860
-  endpoints:
-    - method: GET
-      path: /
-      description: Health check
-    - method: GET
-      path: /health
-      description: Detailed health status
-    - method: GET
-      path: /tasks
-      description: List available tasks
-    - method: POST
-      path: /reset
-      description: Start a new episode
-    - method: POST
-      path: /step
-      description: Take an action
-    - method: POST
-      path: /state
-      description: Get full environment state

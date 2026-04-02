@@ -12,7 +12,7 @@ from incident_triage_env.models import IncidentAction
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN", "")
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or ""
 DRY_RUN = os.getenv("INFERENCE_DRY_RUN", "0") == "1"
 
 SYSTEM_PROMPT = """You are an expert SRE investigating a production incident.
@@ -117,7 +117,7 @@ def run_episode(task: str) -> None:
 
     client: OpenAI | None = None
     if not DRY_RUN:
-        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN or "dummy")
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "dummy")
 
     try:
         obs = env.reset()

@@ -6,6 +6,32 @@ from .scenarios import get_scenario
 
 _VALID_ACTION_TYPES = {a.value for a in ActionType}
 
+_AVAILABLE_ACTIONS = [
+    "query_logs(service)",
+    "query_metrics(service)",
+    "check_topology()",
+    "trace_request(service)",
+    "check_alerts()",
+    "diagnose(service, fault_type, remediation)",
+]
+
+_ACTION_GUIDE = """\
+Investigate the incident by using any of these actions:
+  query_logs(service)                          — fetch recent logs for a service
+  query_metrics(service)                       — fetch CPU, memory, error rate metrics
+  check_topology()                             — show service dependency graph
+  trace_request(service)                       — trace a request through the service mesh
+  check_alerts()                               — list active alerts
+  diagnose(service, fault_type, remediation)   — submit your root cause analysis
+
+Valid fault_type values: oom, cpu_saturated, connection_leak, disk_full, config_error, \
+network_partition, dependency_timeout, certificate_expired, memory_leak, thread_deadlock, dns_failure
+
+Valid remediation values: restart, scale_up, fix_config, clear_disk, rollback, failover, \
+increase_pool, renew_certificate, kill_threads, flush_dns, update_routes, resize_volume
+
+Services in this incident: {services}"""
+
 
 class IncidentTriageEnv:
     """RL environment that simulates SRE incident triage across microservices.
@@ -38,10 +64,13 @@ class IncidentTriageEnv:
         self.history = []
         self.queried_actions = set()
 
+        services = self.scenario["services"]
         return IncidentObservation(
             incident_id=self.scenario["id"],
             summary=self.scenario["incident_summary"],
-            available_services=self.scenario["services"],
+            available_services=services,
+            available_actions=_AVAILABLE_ACTIONS,
+            response=_ACTION_GUIDE.format(services=", ".join(services)),
             step=0,
             done=False,
             score=0.0,
