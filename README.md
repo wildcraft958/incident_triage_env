@@ -5,7 +5,7 @@ colorFrom: red
 colorTo: blue
 sdk: docker
 pinned: false
-app_port: 7860
+app_port: 8000
 base_path: /web
 tags:
   - openenv
@@ -46,7 +46,7 @@ uv run python -m pytest tests/ -v
 uv run server
 
 # Or with uvicorn directly
-uvicorn server.app:app --host 0.0.0.0 --port 7860
+uvicorn server.app:app --host 0.0.0.0 --port 8000
 
 # Dry-run inference (no LLM needed)
 INFERENCE_DRY_RUN=1 python inference.py
@@ -56,7 +56,7 @@ INFERENCE_DRY_RUN=1 python inference.py
 
 ```bash
 docker build -f server/Dockerfile -t incident-triage-env .
-docker run -p 7860:7860 incident-triage-env
+docker run -p 8000:8000 incident-triage-env
 ```
 
 ## Deploy to HuggingFace
@@ -74,26 +74,26 @@ The server exposes both HTTP and WebSocket endpoints via `openenv create_app()`.
 
 ```bash
 # Health check
-curl http://localhost:7860/
+curl http://localhost:8000/
 
 # Reset (start new episode)
-curl -X POST http://localhost:7860/reset \
+curl -X POST http://localhost:8000/reset \
   -H "Content-Type: application/json" \
   -d '{"task": "easy"}'
 
 # Step (stateless -- for multi-step use WebSocket)
-curl -X POST http://localhost:7860/step \
+curl -X POST http://localhost:8000/step \
   -H "Content-Type: application/json" \
   -d '{"action": {"action_type": "check_topology"}}'
 
 # State
-curl http://localhost:7860/state
+curl http://localhost:8000/state
 
 # Metadata
-curl http://localhost:7860/metadata
+curl http://localhost:8000/metadata
 
 # Schema
-curl http://localhost:7860/schema
+curl http://localhost:8000/schema
 ```
 
 ### WebSocket (persistent sessions for multi-step episodes)
@@ -102,7 +102,7 @@ curl http://localhost:7860/schema
 from openenv.core import EnvClient
 from models import IncidentAction, IncidentObservation
 
-with EnvClient(base_url="http://localhost:7860") as client:
+with EnvClient(base_url="http://localhost:8000") as client:
     result = client.reset(task="easy")
     result = client.step(IncidentAction(
         action_type="query_logs", target_service="api-gateway"

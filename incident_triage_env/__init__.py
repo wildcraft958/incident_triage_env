@@ -1,6 +1,5 @@
-from .models import IncidentAction, IncidentObservation, IncidentReward
+from models import IncidentAction, IncidentObservation, IncidentReward
 
-# IncidentTriageEnv is imported lazily so partial builds still work
 try:
     from .env import IncidentTriageEnv
     __all__ = ["IncidentTriageEnv", "IncidentAction", "IncidentObservation", "IncidentReward"]

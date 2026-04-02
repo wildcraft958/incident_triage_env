@@ -36,7 +36,7 @@ def root() -> dict:
     return {"status": "ok", "name": "incident-triage-env", "version": "1.0"}
 
 
-def main(host: str = "0.0.0.0", port: int = 7860) -> None:
+def main(host: str = "0.0.0.0", port: int = 8000) -> None:
     import uvicorn
     uvicorn.run("server.app:app", host=host, port=port)
 

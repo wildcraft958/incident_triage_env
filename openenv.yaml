@@ -1,9 +1,9 @@
 spec_version: 1
-name: incident-triage-env
+name: incident_triage_env
 type: space
 runtime: fastapi
 app: server.app:app
-port: 7860
+port: 8000
 
 version: "1.0.0"
 description: >

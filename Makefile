@@ -43,14 +43,14 @@ docker-build:
 	docker build -t incident-triage-env .
 
 docker-run:
-	docker run -p 7860:7860 incident-triage-env
+	docker run -p 8000:8000 incident-triage-env
 
 docker-test: docker-build
 	@echo "=== Docker Test ==="
-	docker run -d --name ite-test -p 7860:7860 incident-triage-env
+	docker run -d --name ite-test -p 8000:8000 incident-triage-env
 	sleep 3
-	curl -sf http://localhost:7860/ && echo " Health check passed" || echo " Health check failed"
-	curl -sf -X POST http://localhost:7860/reset \
+	curl -sf http://localhost:8000/ && echo " Health check passed" || echo " Health check failed"
+	curl -sf -X POST http://localhost:8000/reset \
 		-H "Content-Type: application/json" \
 		-d '{"task":"easy"}' | python -m json.tool && echo " Reset works" || echo " Reset failed"
 	docker stop ite-test && docker rm ite-test

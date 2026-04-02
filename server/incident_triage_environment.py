@@ -17,7 +17,6 @@ except ImportError:
     from models import IncidentAction, IncidentObservation
 
 from incident_triage_env.env import IncidentTriageEnv
-from incident_triage_env.models import IncidentAction as _InternalAction
 
 
 class IncidentTriageEnvironment(Environment):
@@ -69,13 +68,7 @@ class IncidentTriageEnvironment(Environment):
         if self._inner is None:
             raise RuntimeError("Call reset() before step()")
 
-        inner_action = _InternalAction(
-            action_type=action.action_type,
-            target_service=action.target_service,
-            fault_type=action.fault_type,
-            remediation=action.remediation,
-        )
-        inner_obs, reward, done, _info = self._inner.step(inner_action)
+        inner_obs, reward, done, _info = self._inner.step(action)
         self._state.step_count += 1
         return IncidentObservation(
             incident_id=inner_obs.incident_id,
@@ -95,7 +88,7 @@ class IncidentTriageEnvironment(Environment):
 
     def get_metadata(self) -> EnvironmentMetadata:
         return EnvironmentMetadata(
-            name="incident-triage-env",
+            name="incident_triage_env",
             description=(
                 "SRE incident triage RL environment. Agents investigate production "
                 "incidents by querying logs, metrics, topology, traces, and alerts "

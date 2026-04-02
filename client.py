@@ -19,7 +19,7 @@ class IncidentTriageEnvClient(EnvClient[IncidentAction, IncidentObservation, Sta
     Maintains a persistent WebSocket connection for multi-step episode interactions.
 
     Example:
-        >>> with IncidentTriageEnvClient(base_url="http://localhost:7860") as client:
+        >>> with IncidentTriageEnvClient(base_url="http://localhost:8000") as client:
         ...     result = client.reset(task="easy")
         ...     result = client.step(IncidentAction(
         ...         action_type="query_logs", target_service="api-gateway"
