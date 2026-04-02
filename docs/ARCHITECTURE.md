@@ -19,13 +19,18 @@ graph TB
             HANDLERS["Action Handlers"]
         end
 
-        subgraph DATA["Scenario Data Layer"]
-            SC["scenarios.py - 8 scenarios"]
-            GR["grader.py - Deterministic scoring"]
+        subgraph GEN["Procedural Engine"]
+            PROC["generator.py\nnetworkx DAGs\n10 fault patterns"]
+            TEMP["temporal.py\nSigmoid degradation\nCausal hop delays"]
+        end
+
+        subgraph SCORE["Scoring"]
+            GR["grader.py\nDiagnosis + Evidence scoring"]
         end
 
         API --> ENV
-        ENV --> DATA
+        ENV --> GEN
+        ENV --> SCORE
     end
 
     subgraph AGENT["inference.py - runs separately"]
@@ -41,9 +46,12 @@ graph TB
 ```mermaid
 flowchart TD
     START(("Start")) --> RESET["reset(task)"]
-    RESET -->|"Returns observation"| RUNNING["Running"]
+    RESET -->|"Generator creates\nfresh scenario"| GEN["ProceduralScenarioGenerator"]
+    GEN --> TEMPORAL["TemporalSimulator initialized"]
+    TEMPORAL --> RUNNING["Running"]
     RUNNING -->|"query_logs / query_metrics\ncheck_topology / trace_request\ncheck_alerts"| PROCESS["Process Action"]
-    PROCESS --> REWARD["Compute Reward"]
+    PROCESS --> DEGRADE["Temporal: compute\nmetrics at current step"]
+    DEGRADE --> REWARD["Compute Reward"]
     REWARD --> UPDATE["Update State"]
     UPDATE --> OBS["Return Observation"]
     OBS -->|"done = false"| RUNNING
@@ -52,6 +60,60 @@ flowchart TD
     DONE --> END(("End"))
 ```
 
+## Procedural Generation
+
+```mermaid
+flowchart LR
+    subgraph INPUT["Configuration"]
+        DIFF["difficulty:\neasy/medium/hard"]
+        SEED["optional seed\nfor reproducibility"]
+    end
+
+    subgraph GENERATOR["ProceduralScenarioGenerator"]
+        FP["Pick fault pattern\n(10 available)"]
+        TOPO["Build networkx DAG\n(3-9 services)"]
+        RC["Select root cause\n+ causal chain"]
+        SYNTH["Synthesize:\nlogs, metrics,\nalerts, traces"]
+    end
+
+    subgraph OUTPUT["Scenario Dict"]
+        SVC["services + topology"]
+        BASELINE["metrics_baseline\n(healthy state)"]
+        CRISIS["metrics_crisis\n(full cascade)"]
+        LOGS["logs per service"]
+        CHAIN["causal_chain +\ncausal_distances"]
+    end
+
+    INPUT --> GENERATOR
+    GENERATOR --> OUTPUT
+```
+
+## Temporal Degradation Model
+
+```mermaid
+flowchart TD
+    A["Agent calls query_metrics(service)"] --> B["TemporalSimulator.compute_metrics()"]
+    B --> C{"Is service in\ncausal chain?"}
+    C -->|"No"| D["Return baseline\n(stable, healthy)"]
+    C -->|"Yes"| E["Compute effective progress"]
+    E --> F["progress = step / (max_steps * 0.75)"]
+    F --> G["onset_delay = distance * 0.20"]
+    G --> H["effective = (progress - delay) / (1 - delay)"]
+    H --> I["sigmoid = 1 / (1 + exp(-10 * (t - 0.5)))"]
+    I --> J["metric = baseline + (crisis - baseline) * sigmoid"]
+    J --> K["Return degraded metrics"]
+```
+
+### Sigmoid Curve
+
+At each step, the effective degradation follows a sigmoid:
+
+- Steps 0-3: slow onset (metrics near baseline)
+- Steps 4-8: rapid escalation (metrics climbing fast)
+- Steps 9-12: plateau near crisis values
+
+Services further from root cause start degrading later (20% delay per hop).
+
 ## Request Flow
 
 ```mermaid
@@ -59,58 +121,33 @@ sequenceDiagram
     participant Agent as Agent - inference.py
     participant Server as FastAPI Server
     participant Env as IncidentTriageEnv
+    participant Gen as ProceduralScenarioGenerator
+    participant Temp as TemporalSimulator
     participant Grader as grader.py
 
-    Agent->>Server: POST /reset task=easy
+    Agent->>Server: POST /reset task=hard
     Server->>Env: reset()
-    Env->>Env: Load scenario from scenarios.py
+    Env->>Gen: generate("hard")
+    Gen-->>Env: scenario (networkx DAG + data)
+    Env->>Temp: TemporalSimulator(scenario, 15)
     Env-->>Server: IncidentObservation
     Server-->>Agent: observation, reward=0, done=false
 
     loop Investigation - up to 15 steps
-        Agent->>Server: POST /step action=query_logs
+        Agent->>Server: POST /step action=query_metrics
         Server->>Env: step(action)
-        Env->>Env: Execute handler, check causal chain
+        Env->>Temp: compute_metrics(service, step)
+        Note over Temp: Sigmoid interpolation<br/>between baseline and crisis
         Env-->>Server: IncidentObservation + reward
-        Server-->>Agent: observation, reward=0.05, done=false
+        Server-->>Agent: observation, reward=0.03, done=false
     end
 
-    Agent->>Server: POST /step action=diagnose
+    Agent->>Server: POST /step action=diagnose + evidence
     Server->>Env: step(action)
-    Env->>Grader: grade_diagnosis + grade_investigation_quality
-    Grader-->>Env: score=0.85, breakdown
+    Env->>Grader: grade_diagnosis + hypothesis_evidence
+    Grader-->>Env: score=0.85, evidence_bonus=0.07
     Env-->>Server: IncidentObservation + score
     Server-->>Agent: observation, reward=0.85, done=true
-```
-
-## Scenario Data Model
-
-```mermaid
-flowchart LR
-    subgraph SCENARIO["Scenario"]
-        ID["id: easy-oom-001"]
-        REF["ref: Meta 2021 BGP"]
-        SUMMARY["summary: ALERT text"]
-        SVCS["services: 3-8"]
-    end
-
-    subgraph ROOT["Root Cause"]
-        RS["service: auth-service"]
-        RF["fault_type: oom"]
-        RR["remediation: restart"]
-    end
-
-    subgraph EVIDENCE["Evidence"]
-        TOPO["topology: dependency graph"]
-        LOGS["logs: per-service log lines"]
-        METRICS["metrics: CPU, memory, errors"]
-        ALERTS["alerts: active + noise"]
-        TRACES["traces: request spans"]
-        BLIND["blind_metrics: stale data"]
-    end
-
-    SCENARIO --> ROOT
-    SCENARIO --> EVIDENCE
 ```
 
 ## Grading Logic
@@ -134,13 +171,13 @@ flowchart TD
     I -->|"Yes"| J["+0.25"]
     I -->|"No"| K["+0.00"]
 
-    J --> L{"Fast diagnosis?"}
-    C --> L
-    L -->|"<= 50% steps"| M["+0.05 efficiency bonus"]
-    L -->|"> 50% steps"| N["No bonus"]
+    J --> EV{"hypothesis_evidence\ncites root service\n+ signal keywords?"}
+    C --> EV
+    EV -->|"Yes"| EVB["up to +0.10"]
+    EV -->|"No/empty"| EVN["+0.00"]
 
-    M --> P["Apply blind penalty\nand investigation quality"]
-    N --> P
+    EVB --> P["Apply blind penalty\nand investigation quality"]
+    EVN --> P
     K --> P
     E --> P
     P --> O["Final score 0.0 - 1.0"]
@@ -165,10 +202,10 @@ flowchart LR
     end
 
     subgraph Hard["Hard"]
-        H1["6-8 services"]
-        H2["4-5 deep chain"]
-        H3["Zero errors + blind metrics"]
-        H4["Silent degradation, monitoring down"]
+        H1["6-9 services"]
+        H2["3-5 deep chain"]
+        H3["Monitoring blindness + stale metrics"]
+        H4["Kafka staleness, DNS failure, memory leak, deadlock"]
     end
 
     Easy --> Medium --> Hard
@@ -178,13 +215,15 @@ flowchart LR
 
 | File | Role | Key Constraint |
 |------|------|---------------|
-| `models.py` | Pydantic models extending openenv types | Fully typed, all fields documented |
-| `incident_triage_env/env.py` | Core environment with reset/step/state | Clean state management, proper episode boundaries |
-| `incident_triage_env/scenarios.py` | 8 scenario definitions with logs, metrics, topology | Grounded in real post-mortems, randomized on reset |
-| `incident_triage_env/grader.py` | Diagnosis + investigation quality scoring | Deterministic, range [0.0, 1.0], partial credit |
-| `incident_triage_env/real_incidents.py` | Maps real outages to scenario structures | Source of truth for incident patterns |
+| `models.py` | Pydantic models extending openenv types | Fully typed, includes hypothesis_evidence |
+| `incident_triage_env/env.py` | Core environment with reset/step/state | Integrates generator + temporal simulator |
+| `incident_triage_env/generator.py` | Procedural scenario generation | networkx DAGs, 10 fault patterns, 40+ service names |
+| `incident_triage_env/temporal.py` | Dynamic metric degradation | Sigmoid curves, causal hop delays |
+| `incident_triage_env/grader.py` | Diagnosis + evidence + investigation scoring | Deterministic, range [0.0, 1.0], partial credit |
+| `incident_triage_env/scenarios.py` | Scenario accessor (delegates to generator) | Backward compat pool lists |
 | `incident_triage_env/log_templates.py` | Realistic log generators from LogHub | Timestamps, thread IDs, stack traces |
+| `incident_triage_env/real_incidents.py` | Maps real outages to fault patterns | Reference data for pattern design |
 | `server/app.py` | FastAPI server via create_app() | HTTP + WebSocket + MCP |
 | `server/incident_triage_environment.py` | OpenEnv Environment adapter | Bridges env.py to openenv interface |
-| `inference.py` | Baseline LLM agent | Exact [START]/[STEP]/[END] stdout format |
-| `client.py` | EnvClient for WebSocket sessions | Typed step/reset/state |
+| `inference.py` | Baseline LLM agent | Temporal-aware prompting, evidence citation |
+| `scripts/chaos_evaluator.py` | Stress test harness | Hallucination detection, loop tracking |
