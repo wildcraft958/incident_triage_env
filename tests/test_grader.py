@@ -150,6 +150,43 @@ class TestInvestigationQuality:
         assert len(set(scores)) == 1
 
 
+class TestEvidenceScoring:
+    """hypothesis_evidence must produce bonus points."""
+
+    def test_no_evidence_no_bonus(self):
+        gt = {"service": "auth-service", "fault_type": "oom", "remediation": "restart"}
+        chain = ["auth-service"]
+        r = grade_diagnosis("auth-service", "oom", "restart", gt, chain)
+        assert r["breakdown"]["evidence_bonus"] == 0.0
+
+    def test_evidence_mentioning_root_service_gives_bonus(self):
+        gt = {"service": "auth-service", "fault_type": "oom", "remediation": "restart"}
+        chain = ["auth-service"]
+        r = grade_diagnosis(
+            "auth-service", "oom", "restart", gt, chain,
+            hypothesis_evidence="auth-service showed OutOfMemoryError",
+        )
+        assert r["breakdown"]["evidence_bonus"] > 0
+
+    def test_evidence_with_signal_keywords_gives_more_bonus(self):
+        gt = {"service": "auth-service", "fault_type": "oom", "remediation": "restart"}
+        chain = ["auth-service"]
+        r = grade_diagnosis(
+            "auth-service", "oom", "restart", gt, chain,
+            hypothesis_evidence="auth-service heap at 99%, OutOfMemoryError in logs, GC overhead",
+        )
+        assert r["breakdown"]["evidence_bonus"] >= 0.05
+
+    def test_evidence_bonus_capped(self):
+        gt = {"service": "svc", "fault_type": "oom", "remediation": "restart"}
+        chain = ["svc"]
+        r = grade_diagnosis(
+            "svc", "oom", "restart", gt, chain,
+            hypothesis_evidence="svc heap outofmemoryerror gc overhead memory_pct all keywords",
+        )
+        assert r["breakdown"]["evidence_bonus"] <= 0.10
+
+
 class TestBlindDiagnosisPenalty:
     """Agents that diagnose without investigating should be penalized."""
 

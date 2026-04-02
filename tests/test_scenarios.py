@@ -1,4 +1,4 @@
-"""Tests for scenario data integrity."""
+"""Tests for scenario data integrity (procedurally generated)."""
 
 import pytest
 from incident_triage_env.scenarios import get_scenario, EASY_SCENARIOS, MEDIUM_SCENARIOS, HARD_SCENARIOS
@@ -98,6 +98,12 @@ class TestScenarioPools:
     def test_get_scenario_invalid(self):
         with pytest.raises(ValueError):
             get_scenario("impossible", 0)
+
+    def test_get_scenario_deterministic_with_index(self):
+        s1 = get_scenario("easy", 5)
+        s2 = get_scenario("easy", 5)
+        assert s1["id"] == s2["id"]
+        assert s1["services"] == s2["services"]
 
 
 class TestDifficultyProgression:
