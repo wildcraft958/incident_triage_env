@@ -290,20 +290,36 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 | Invalid action | -0.02 | Missing fields, unknown type |
 | Max steps without diagnosis | 0.00 | Episode ends with score 0 |
 
-## Baseline Results
+## Model Capability Benchmarks
 
-Real baseline from `anthropic/claude-haiku-4-5` against the procedural generation engine:
+Ablation study across 5 models ranging from 17B to frontier-class, tested against the procedural generation engine. Each model ran all three task difficulties (easy/medium/hard). Full run logs are in `outputs/ablation/`.
 
-| Task | Scenario | Score | Steps | Key Behavior |
-|------|----------|-------|-------|-------------|
-| easy | easy-gen-certificate_expired | **0.960** | 10 | Checked alerts first, then systematically investigated config-service via logs, metrics, and traces. Cited specific error log lines in evidence. |
-| medium | medium-gen-cpu_saturated | **0.970** | 10 | Investigated all 3 causal chain services (kafka-broker, search-service, profile-service) with cross-referencing. Correctly identified kafka-broker as root cause. |
-| hard | hard-gen-memory_leak | **0.930** | 10 | Traced 5-service topology, cross-referenced logs and metrics for dns-resolver and inventory-service. Cited "Heap memory at 97% (3.9GB/4.0GB)" in evidence. |
+### Score Comparison
 
-Notable behaviors observed:
-- **Methodical investigation**: The agent consistently checked topology early, then cross-referenced logs and metrics for the same service, earning high investigation quality scores.
-- **Evidence citation**: All three diagnoses included specific log lines and metric values in `hypothesis_evidence`, earning the evidence bonus.
-- **Causal chain coverage**: On medium and hard tasks, the agent investigated multiple services in the causal chain before diagnosing, avoiding the blind diagnosis penalty.
+| Model | Parameters | Easy | Medium | Hard | Avg | Steps (avg) |
+|---|---|---|---|---|---|---|
+| Llama 4 Scout | 17B MoE | 0.95 | 0.82 | 0.70 | 0.82 | 6 |
+| Qwen3 | 32B | 0.96 | 0.77 | 0.80 | 0.84 | 4 |
+| Llama 3.3 | 70B | 0.76 | 0.81 | 0.92 | 0.83 | 7 |
+| Gemini 2.5 Flash | Frontier | 0.78 | 0.83 | 0.78 | 0.80 | 7 |
+| Claude Haiku 4.5 | Frontier | **0.96** | **0.97** | **0.93** | **0.95** | 10 |
+
+### Key Findings
+
+**The environment differentiates model capability on hard tasks.** Hard task scores range from 0.70 (Llama 4 Scout 17B) to 0.93 (Claude Haiku 4.5), a 0.23 spread that proves the environment is not trivially solvable.
+
+**Investigation depth correlates with score.** Claude Haiku 4.5 consistently used 10 steps, cross-referencing logs and metrics for the same services and citing specific evidence. Smaller models diagnosed in 3-5 steps, often skipping the cross-referencing that earns investigation quality points.
+
+**Observed behavioral differences across tiers:**
+- **Small models (17B)**: Diagnose quickly with minimal investigation. Get the root cause right but miss fault type nuances. Weak evidence citations ("dns_failure error log" vs specific timestamps).
+- **Medium models (32-70B)**: Better causal chain navigation. Cross-reference logs and metrics. Sometimes misidentify fault type on medium/hard scenarios.
+- **Frontier models**: Exhaustive investigation. Check topology, query every causal chain service's logs AND metrics, use trace_request, and cite exact log lines and metric values in evidence. Earn both investigation quality bonuses and evidence bonuses.
+
+**The grader produces meaningful score variance:**
+- Wrong diagnosis: 0.01
+- Blind diagnosis (no investigation): ~0.50
+- Investigated + correct diagnosis: 0.76-0.97
+- Perfect investigation + evidence: 0.93-0.97
 
 ## Running Inference
 

@@ -106,10 +106,16 @@ def run_llm_action(client: OpenAI, messages: list[dict]) -> IncidentAction:
         model=MODEL_NAME,
         messages=messages,
         temperature=0.0,
-        max_tokens=256,
+        max_tokens=2048,
     )
     raw = response.choices[0].message.content or ""
     raw = raw.strip()
+
+    # Strip <think>...</think> reasoning blocks (Qwen3, DeepSeek-R1, etc.)
+    # Also handle truncated think blocks where </think> was cut off
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+    if raw.startswith("<think>"):
+        raw = ""
 
     # Strip markdown code fences if present
     if raw.startswith("```"):
@@ -117,7 +123,7 @@ def run_llm_action(client: OpenAI, messages: list[dict]) -> IncidentAction:
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
 
     # Extract first JSON object if LLM added preamble/postamble text
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    match = re.search(r"\{[^{}]*\}", raw)
     if match:
         raw = match.group(0)
 

@@ -92,7 +92,7 @@ def call_llm_with_backoff(client: OpenAI, messages: list[dict]) -> str:
                 model=MODEL_NAME,
                 messages=messages,
                 temperature=0.0,
-                max_tokens=256,
+                max_tokens=2048,
             )
             return response.choices[0].message.content or ""
         except Exception as exc:
@@ -108,10 +108,14 @@ def call_llm_with_backoff(client: OpenAI, messages: list[dict]) -> str:
 def parse_action(raw: str) -> IncidentAction | None:
     """Parse LLM output into IncidentAction."""
     raw = raw.strip()
+    # Strip <think>...</think> reasoning blocks (Qwen3, DeepSeek-R1, etc.)
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+    if raw.startswith("<think>"):
+        raw = ""
     if raw.startswith("```"):
         lines = raw.splitlines()
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    match = re.search(r"\{[^{}]*\}", raw)
     if match:
         raw = match.group(0)
     data = json.loads(raw)
