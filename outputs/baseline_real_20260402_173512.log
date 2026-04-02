@@ -1,0 +1,23 @@
+[START] task=easy env=incident_triage model=Qwen/Qwen3.5-27B
+[STEP] step=1 action=query_logs(auth-service) reward=0.05 done=false error=null
+[STEP] step=2 action=query_metrics(auth-service) reward=0.03 done=false error=null
+[STEP] step=3 action=diagnose(auth-service,oom,scale_up) reward=0.75 done=true error=null
+[END] success=true steps=3 score=0.748 rewards=0.05,0.03,0.75
+[START] task=medium env=incident_triage model=Qwen/Qwen3.5-27B
+[STEP] step=1 action=__parse_error__() reward=-0.02 done=false error=Extra data: line 2 column 1 (char 32)
+[STEP] step=2 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(worker-service-a) reward=0.05 done=false error=null
+[STEP] step=4 action=query_logs(worker-service-b) reward=0.05 done=false error=null
+[STEP] step=5 action=query_logs(config-service) reward=0.05 done=false error=null
+[STEP] step=6 action=diagnose(worker-service-a,config_error,rollback) reward=0.75 done=true error=null
+[END] success=true steps=6 score=0.750 rewards=-0.02,0.03,0.05,0.05,0.05,0.75
+[START] task=hard env=incident_triage model=Qwen/Qwen3.5-27B
+[STEP] step=1 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=2 action=query_logs(dns-resolver) reward=0.05 done=false error=null
+[STEP] step=3 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=4 action=query_metrics(dns-resolver) reward=0.03 done=false error=null
+[STEP] step=5 action=query_logs(network-controller) reward=0.05 done=false error=null
+[STEP] step=6 action=query_logs(api-gateway) reward=0.05 done=false error=null
+[STEP] step=7 action=query_logs(network-controller) reward=-0.01 done=false error=null
+[STEP] step=8 action=diagnose(network-controller,network_partition,update_routes) reward=0.52 done=true error=null
+[END] success=true steps=8 score=0.517 rewards=0.03,0.05,0.02,0.03,0.05,0.05,-0.01,0.52

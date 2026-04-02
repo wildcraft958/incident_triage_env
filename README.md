@@ -213,13 +213,18 @@ Score ranges across all 8 scenarios with 3 play styles:
 
 Every scenario produces different scores for the same play style. Scores differentiate by scenario complexity (service count, causal chain depth).
 
-Baseline results from `Qwen/Qwen3.5-27B` via HuggingFace router:
+Baseline results from `Qwen/Qwen3.5-27B` via HuggingFace router (2 runs, randomized scenarios):
 
-| Task | Score | Steps |
-|------|-------|-------|
-| easy | 0.88 | 3 |
-| medium | 0.68 | 4 |
-| hard | 0.85 | 7 |
+| Run | Task | Scenario | Score | Steps |
+|-----|------|----------|-------|-------|
+| 1 | easy | easy-cert-001 | 0.772 | 5 |
+| 1 | medium | medium-connleak-001 | 0.538 | 4 |
+| 1 | hard | hard-kafka-staleness-001 | 0.924 | 7 |
+| 2 | easy | easy-oom-001 | 0.748 | 3 |
+| 2 | medium | medium-config-001 | 0.750 | 6 |
+| 2 | hard | hard-network-blindspot-001 | 0.517 | 8 |
+
+The monitoring-blindness hard scenario (0.517) is significantly harder than the staleness scenario (0.924), showing genuine difficulty variance across scenarios.
 
 ## Running Inference
 

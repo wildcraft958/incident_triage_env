@@ -1,0 +1,22 @@
+[START] task=easy env=incident_triage model=Qwen/Qwen3.5-27B
+[STEP] step=1 action=__parse_error__() reward=-0.02 done=false error=Extra data: line 2 column 1 (char 32)
+[STEP] step=2 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(auth-service) reward=0.05 done=false error=null
+[STEP] step=4 action=query_logs(cert-manager) reward=0.05 done=false error=null
+[STEP] step=5 action=diagnose(auth-service,certificate_expired,renew_certificate) reward=0.77 done=true error=null
+[END] success=true steps=5 score=0.772 rewards=-0.02,0.03,0.05,0.05,0.77
+[START] task=medium env=incident_triage model=Qwen/Qwen3.5-27B
+[STEP] step=1 action=query_logs(order-service) reward=0.05 done=false error=null
+[STEP] step=2 action=query_metrics(order-service) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(postgres-db) reward=0.05 done=false error=null
+[STEP] step=4 action=diagnose(order-service,connection_leak,restart) reward=0.54 done=true error=null
+[END] success=true steps=4 score=0.538 rewards=0.05,0.03,0.05,0.54
+[START] task=hard env=incident_triage model=Qwen/Qwen3.5-27B
+[STEP] step=1 action=query_logs(recommendation-service) reward=0.05 done=false error=null
+[STEP] step=2 action=query_metrics(recommendation-service) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(ml-model-server) reward=0.05 done=false error=null
+[STEP] step=4 action=query_logs(feature-store) reward=0.05 done=false error=null
+[STEP] step=5 action=query_logs(kafka-consumer) reward=0.05 done=false error=null
+[STEP] step=6 action=query_logs(kafka-broker) reward=0.05 done=false error=null
+[STEP] step=7 action=diagnose(kafka-broker,disk_full,clear_disk) reward=0.92 done=true error=null
+[END] success=true steps=7 score=0.924 rewards=0.05,0.03,0.05,0.05,0.05,0.05,0.92
