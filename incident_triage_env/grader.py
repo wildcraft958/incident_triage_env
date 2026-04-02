@@ -1,12 +1,29 @@
 """Deterministic scoring for agent diagnoses and investigation quality."""
 
 
+EVIDENCE_KEYWORDS: dict[str, list[str]] = {
+    "oom": ["outofmemoryerror", "heap", "gc overhead", "memory_pct"],
+    "cpu_saturated": ["cpu", "100%", "thread pool", "saturated"],
+    "connection_leak": ["pool exhausted", "connection pool", "idle connections", "connections in use"],
+    "disk_full": ["no space left", "disk full", "read-only", "disk_usage"],
+    "config_error": ["config push", "config change", "rollback", "config_error"],
+    "network_partition": ["network", "partition", "unreachable"],
+    "dependency_timeout": ["timeout", "timed out", "dependency"],
+    "certificate_expired": ["certificate", "tls", "handshake", "expired", "cert"],
+    "memory_leak": ["memory", "heap", "leak", "climbing"],
+    "thread_deadlock": ["deadlock", "thread", "hung", "zero throughput"],
+    "dns_failure": ["dns", "servfail", "resolution", "unreachable"],
+}
+
+
 def grade_diagnosis(
     service: str | None,
     fault_type: str | None,
     remediation: str | None,
     ground_truth: dict,
     causal_chain: list[str],
+    hypothesis_evidence: str | None = None,
+    scenario: dict | None = None,
 ) -> dict:
     """Grade a submitted diagnosis against the ground truth.
 
@@ -26,16 +43,21 @@ def grade_diagnosis(
     fault_correct = 0.35 if (fault_type == gt_fault and service_identified) else 0.0
     remediation_correct = 0.25 if (remediation == gt_remediation and service_identified) else 0.0
 
-    score = min(1.0, max(0.0, service_correct + service_partial + fault_correct + remediation_correct))
+    base_score = service_correct + service_partial + fault_correct + remediation_correct
+
+    evidence_bonus = _score_evidence(hypothesis_evidence, gt_service, gt_fault, scenario)
+
+    score = min(1.0, max(0.0, base_score + evidence_bonus))
 
     breakdown = {
         "service_correct": service_correct,
         "service_partial": service_partial,
         "fault_correct": fault_correct,
         "remediation_correct": remediation_correct,
+        "evidence_bonus": evidence_bonus,
     }
 
-    if score == 1.0:
+    if score >= 1.0:
         message = "Perfect diagnosis."
     elif score == 0.0:
         message = "Incorrect diagnosis."
@@ -49,9 +71,37 @@ def grade_diagnosis(
             parts.append("fault type correct")
         if remediation_correct:
             parts.append("remediation correct")
+        if evidence_bonus > 0:
+            parts.append(f"evidence bonus +{evidence_bonus:.2f}")
         message = "Partial credit: " + ", ".join(parts) + "."
 
     return {"score": score, "breakdown": breakdown, "message": message}
+
+
+def _score_evidence(
+    hypothesis_evidence: str | None,
+    root_service: str,
+    fault_type: str,
+    scenario: dict | None,
+) -> float:
+    """Score hypothesis evidence for up to +0.10 bonus."""
+    if not hypothesis_evidence:
+        return 0.0
+
+    bonus = 0.0
+    evidence_lower = hypothesis_evidence.lower()
+
+    # +0.05 if evidence references the root cause service
+    if root_service.lower() in evidence_lower:
+        bonus += 0.05
+
+    # +0.02 per matching signal keyword (max +0.05)
+    keywords = EVIDENCE_KEYWORDS.get(fault_type, [])
+    matches = sum(1 for kw in keywords if kw.lower() in evidence_lower)
+    if matches > 0:
+        bonus += min(0.05, matches * 0.02)
+
+    return round(bonus, 2)
 
 
 def grade_investigation_quality(

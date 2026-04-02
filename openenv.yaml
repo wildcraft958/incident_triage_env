@@ -51,7 +51,7 @@ action_space:
       description: View active alerts and alert history
       parameters: []
     - name: diagnose
-      description: Submit a root-cause diagnosis to end the episode
+      description: Submit a root-cause diagnosis with supporting evidence
       parameters:
         - name: target_service
           type: string
@@ -87,6 +87,10 @@ action_space:
             - flush_dns
             - update_routes
             - resize_volume
+        - name: hypothesis_evidence
+          type: string
+          required: false
+          description: Evidence citations (log timestamps, metric values) supporting the diagnosis
 
 observation_space:
   type: dict

@@ -52,6 +52,7 @@ class IncidentAction(Action):
     target_service: Optional[str] = Field(None, description="Service to query or diagnose")
     fault_type: Optional[str] = Field(None, description="Fault type for diagnose action")
     remediation: Optional[str] = Field(None, description="Remediation for diagnose action")
+    hypothesis_evidence: Optional[str] = Field(None, description="Evidence citations (log timestamps, metric values) supporting diagnosis")
 
 
 class IncidentObservation(Observation):
