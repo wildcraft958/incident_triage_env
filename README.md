@@ -13,7 +13,7 @@ tags:
 
 # Incident Triage Environment
 
-An RL environment that simulates SRE incident triage across microservices. AI agents investigate production outages by querying logs, metrics, topology, traces, and alerts, then submit a root-cause diagnosis for scoring.
+An RL environment that simulates SRE incident triage across microservices. AI agents investigate production outages by querying logs, metrics, topology, traces, and alerts, then submit a root-cause diagnosis with supporting evidence for scoring.
 
 Built for the [OpenEnv Hackathon](https://openenvhackathon.com/) (Scaler + HuggingFace + Meta).
 
@@ -23,18 +23,11 @@ Every engineering team running microservices deals with production incidents. An
 
 This is a high-stakes reasoning task that happens thousands of times a day across the industry. Companies like PagerDuty, incident.io, and Observe are building AI tooling for exactly this. Yet no RL environment exists to train or evaluate agents on incident investigation.
 
-This environment fills that gap. Every scenario is grounded in a documented real-world outage:
+This environment fills that gap with three key innovations:
 
-| Scenario Basis | What Happened | Our Mapping |
-|---|---|---|
-| **Common Java OOM** | JVM heap exhaustion, container OOMKilled | Easy: clear error logs, single service |
-| **PostgreSQL disk full** | WAL logs filling disk, writes blocked | Easy: disk usage metrics, FATAL in logs |
-| **mTLS cert expiry** | Certificate renewal failed, handshakes rejected | Easy: TLS errors trace to cert-manager |
-| **GitHub Actions** | DB connection leak gradually exhausted pool | Medium: slow degradation, no error logs from leaker |
-| **CrowdStrike 2024** | Bad config push crashed 8.5M machines simultaneously | Medium: config push with misleading per-service errors |
-| **Slack 2020** | Autoscaler thundering herd overwhelmed config service | Medium: new instances can't bootstrap, config CPU 100% |
-| **ML pipeline staleness** | Kafka disk full caused silent prediction degradation | Hard: zero errors, business metric is only signal |
-| **Meta 2021** | BGP route withdrawal, monitoring also broken | Hard: monitoring blindness, stale metrics, DNS cascade |
+1. **Procedural generation** produces infinite unique scenarios, preventing RL overfitting
+2. **Temporal simulation** makes incidents cascade over time via sigmoid degradation curves
+3. **Explainable AI scoring** rewards agents that cite evidence for their diagnosis
 
 ## How It Works
 
@@ -44,13 +37,15 @@ graph TB
     B -->|Observation: incident summary, services| A
     A -->|"step(query_logs, 'auth-service')"| B
     B -->|"Observation: log lines, reward=0.05"| A
-    A -->|"step(diagnose, service, fault, fix)"| B
+    A -->|"step(diagnose, service, fault, fix, evidence)"| B
     B -->|"Observation: score=0.85, done=true"| A
 
-    B --> C[scenarios.py]
-    B --> D[grader.py]
-    C --> E["Real incident data\n(5 scenarios across 3 difficulties)"]
-    D --> F["Deterministic scoring\n(0.0 - 1.0, partial credit)"]
+    B --> C[ProceduralScenarioGenerator]
+    B --> D[TemporalSimulator]
+    B --> E[grader.py]
+    C --> F["networkx DAG topologies\n10 fault patterns\n40+ service names"]
+    D --> G["Sigmoid degradation\nCausal hop delays\nProgressive log reveal"]
+    E --> H["Diagnosis + Evidence scoring\n(0.0 - 1.0, partial credit)"]
 ```
 
 ## Quick Start
@@ -85,6 +80,106 @@ docker run -p 8000:8000 incident-triage-env
 openenv push --repo-id your-username/incident-triage-env
 ```
 
+## Procedural Scenario Generation
+
+The environment does not use static, hardcoded scenarios. Every call to `reset()` generates a fresh scenario using the `ProceduralScenarioGenerator`, which composes incidents from constrained building blocks.
+
+### networkx DAG Topologies
+
+Service dependency graphs are generated as Directed Acyclic Graphs using `networkx`. Each topology is validated with `nx.is_directed_acyclic_graph()`. The generator selects services from a curated pool of 40+ realistic microservice names across 6 architectural layers (gateway, application, data, infrastructure, observability, ML) and wires them into difficulty-appropriate shapes:
+
+| Difficulty | Services | Topology Shape | Causal Chain | Characteristics |
+|---|---|---|---|---|
+| easy | 3-4 | Linear chain | 1-2 deep | Single service fault, clear signals |
+| medium | 4-6 | Fanout with bottleneck | 2-4 deep | Cascading failure, red-herring bystanders |
+| hard | 6-9 | Deep tree, multiple paths | 3-5 deep | Monitoring blindness, stale metrics |
+
+### 10 Fault Patterns
+
+Each pattern defines a fault type, remediation, log category, metric signature, and cascade behavior:
+
+| Pattern | Fault Type | Remediation | Cascade Effect | Real-World Basis |
+|---|---|---|---|---|
+| java-oom | oom | restart | error_propagation | Spring Boot/Kafka/Elasticsearch OOM |
+| disk-full-db | disk_full | clear_disk | error_propagation | PostgreSQL WAL accumulation |
+| disk-full-kafka | disk_full | clear_disk | stale_data | Kafka log segment exhaustion |
+| connection-leak | connection_leak | increase_pool | connection_exhaust | GitHub Actions DB leaks |
+| config-push | config_error | rollback | error_propagation | CrowdStrike 2024 |
+| cert-expired | certificate_expired | renew_certificate | error_propagation | mTLS cert rotation failures |
+| thundering-herd | cpu_saturated | scale_up | timeout | Slack 2020 provisioning storm |
+| dns-failure | dns_failure | flush_dns | error_propagation | Meta 2021 BGP outage |
+| memory-leak | memory_leak | restart | timeout | Gradual heap exhaustion |
+| thread-deadlock | thread_deadlock | kill_threads | timeout | Thread pool starvation |
+
+### Infinite Replayability
+
+The generator uses Python's `random.Random` with optional seeding. Without a seed, every `reset()` produces a unique scenario. With a seed, scenarios are deterministically reproducible for benchmarking.
+
+```python
+# Unique scenario every time
+env.reset()
+
+# Reproducible scenario
+gen = ProceduralScenarioGenerator(seed=42)
+scenario = gen.generate("medium")
+```
+
+## Temporal Simulation and Cascading Failures
+
+This is not a static environment. The incident state evolves as the agent takes steps.
+
+### Sigmoid Degradation Curves
+
+Metrics are mathematically computed at each step using sigmoid interpolation between healthy baselines and crisis values:
+
+```
+sigmoid(t) = 1 / (1 + exp(-10 * (t - 0.5)))
+metric(step) = baseline + (crisis - baseline) * sigmoid(effective_progress)
+```
+
+This produces realistic degradation: slow onset, rapid escalation in the middle, and plateau near crisis values.
+
+For example, a root cause service's error rate might evolve:
+- Step 0: 1.2% (baseline)
+- Step 3: 5.8% (early warning)
+- Step 6: 48.3% (rapid escalation)
+- Step 9: 91.7% (near crisis)
+- Step 12: 99.8% (full crisis)
+
+### Causal Hop Delays
+
+Services further from the root cause in the dependency chain experience delayed degradation. Each hop adds a 20% delay to the onset of symptoms:
+
+- Root cause (distance 0): degrades immediately
+- Direct dependent (distance 1): 20% delay before onset
+- Second hop (distance 2): 40% delay before onset
+
+This means an agent investigating at step 2 might see the root cause already failing while downstream services still look healthy. By step 8, the cascade has spread through the entire chain.
+
+### Progressive Log Revelation
+
+Logs for causal chain services reveal progressively. At early steps, only the first few log lines are visible. As the incident progresses, more evidence appears. Non-causal "bystander" services show their full (healthy) logs from step 0, acting as realistic noise.
+
+## Explainable AI Scoring
+
+The `diagnose` action accepts an optional `hypothesis_evidence` parameter where agents cite the specific log lines, metric values, or timestamps that led to their conclusion.
+
+```json
+{
+    "action_type": "diagnose",
+    "target_service": "postgres-db",
+    "fault_type": "disk_full",
+    "remediation": "clear_disk",
+    "hypothesis_evidence": "postgres-db disk_usage_pct at 100%, FATAL: No space left on device at 10:14:55Z"
+}
+```
+
+The grader awards up to +0.10 bonus for quality evidence:
+- +0.05 if the evidence references the root cause service by name
+- +0.02 per matching signal keyword (max +0.05): e.g., "OutOfMemoryError", "heap", "disk full", "pool exhausted"
+
+This rewards agents that build transparent, verifiable reasoning chains rather than guessing.
+
 ## Tasks
 
 Three difficulty levels with meaningful progression:
@@ -97,21 +192,15 @@ graph LR
     subgraph Medium["Medium (4-6 services)"]
         M1["Cascading failure\n2-3 service chain\nTimestamp correlation needed"]
     end
-    subgraph Hard["Hard (6-8 services)"]
-        H1["Silent degradation\n5-service causal chain\nZero application errors"]
+    subgraph Hard["Hard (6-9 services)"]
+        H1["Silent degradation\n5-service causal chain\nMonitoring blindness"]
     end
     Easy --> Medium --> Hard
 ```
 
-| Task | Services | Causal Chain | Baseline Score | What Makes It Hard |
-|------|----------|-------------|---------------|-------------------|
-| easy | 3-4 | 1-2 deep | 0.88 | Single service OOM, disk-full, or cert expiry. Logs point directly at fault. |
-| medium | 4-6 | 2-4 deep | 0.68 | Cascading failure, thundering herd, config push. Timestamp correlation needed. |
-| hard | 6-8 | 4-5 deep | 0.85 | Zero application errors, monitoring blindness. Business metric is only signal. |
-
 ## Action Space
 
-Six investigation actions that mirror what real SREs do:
+Seven investigation actions that mirror what real SREs do:
 
 | Action | Parameters | Reward Signal |
 |--------|-----------|--------------|
@@ -120,7 +209,7 @@ Six investigation actions that mirror what real SREs do:
 | `check_topology()` | none | +0.02 (first time) |
 | `trace_request(service)` | `target_service: str` (optional) | +0.04 if service in causal chain (first time) |
 | `check_alerts()` | none | +0.03 (first time) |
-| `diagnose(service, fault_type, remediation)` | all three required | 0.0 - 1.0 (see scoring) |
+| `diagnose(service, fault_type, remediation, hypothesis_evidence)` | all required except evidence | 0.0 - 1.0 (see scoring) |
 
 - Repeated identical queries: -0.01 (discourages loops)
 - Invalid or malformed actions: -0.02
@@ -134,7 +223,7 @@ Six investigation actions that mirror what real SREs do:
 | `summary` | string | Alert text the on-call SRE received |
 | `available_services` | list[string] | Services available to query |
 | `available_actions` | list[string] | Action signatures with parameters |
-| `response` | string | Result of the last action (logs, metrics, topology, etc.) |
+| `response` | string | Result of the last action (evolves with temporal state) |
 | `step` | int | Current step number |
 | `done` | bool | Whether the episode has ended |
 | `reward` | float | Reward from the last action |
@@ -142,15 +231,16 @@ Six investigation actions that mirror what real SREs do:
 
 ## Scoring
 
-The final score combines diagnosis accuracy (75%) and investigation quality (25%):
+The final score combines diagnosis accuracy (70%) and investigation quality (30%):
 
 ```mermaid
 graph LR
-    subgraph "Diagnosis Score (75%)"
+    subgraph "Diagnosis Score (70%)"
         S["Correct service\n+0.40"] --- F["Correct fault type\n+0.35"]
         F --- R["Correct remediation\n+0.25"]
+        R --- EV["Evidence bonus\nup to +0.10"]
     end
-    subgraph "Investigation Quality (25%)"
+    subgraph "Investigation Quality (30%)"
         T["Topology timing"] --- C["Chain coverage"]
         C --- X["Cross-referencing"]
         X --- FO["Focus ratio"]
@@ -167,7 +257,9 @@ graph LR
 - Staying focused on relevant services (not querying everything)
 - Following dependency links in investigation order
 
-**Blind diagnosis penalty** scales with causal chain length -- harder scenarios need more investigation. Agents that diagnose with 0 investigation steps lose 0.17-0.40 from their score depending on scenario complexity.
+**Blind diagnosis penalty** scales with causal chain length. Harder scenarios need more investigation. Uses unique (action, service) pairs to prevent exploit via repeated identical actions.
+
+**Evidence bonus** rewards transparent reasoning. Agents that cite specific log lines or metric values from the root cause service score up to +0.10 higher.
 
 | Component | Points | Condition |
 |-----------|--------|-----------|
@@ -175,6 +267,7 @@ graph LR
 | Service in causal chain | +0.15 | Partial credit if not exact |
 | Fault type correct | +0.35 | Only if service identified |
 | Remediation correct | +0.25 | Only if service identified |
+| Evidence bonus | up to +0.10 | Root service cited + signal keywords |
 | Efficiency bonus | +0.05 | Diagnosed in 50% or fewer of max steps |
 
 **Valid fault types:** `oom`, `cpu_saturated`, `connection_leak`, `disk_full`, `config_error`, `network_partition`, `dependency_timeout`, `certificate_expired`, `memory_leak`, `thread_deadlock`, `dns_failure`
@@ -197,35 +290,6 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 | Invalid action | -0.02 | Missing fields, unknown type |
 | Max steps without diagnosis | 0.00 | Episode ends with score 0 |
 
-## Benchmark Results
-
-Score ranges across all 8 scenarios with 3 play styles:
-
-| Task | Scenarios | Perfect Play | Blind Guess | Wrong Diagnosis |
-|------|-----------|-------------|-------------|-----------------|
-| easy | 3 | 0.884 - 0.959 | 0.546 - 0.592 | 0.062 - 0.209 |
-| medium | 3 | 0.853 - 0.865 | 0.458 - 0.505 | 0.065 - 0.148 |
-| hard | 2 | 0.854 - 0.859 | 0.444 - 0.464 | 0.144 - 0.146 |
-
-- **Perfect play**: check topology, query logs+metrics of root cause, then diagnose correctly
-- **Blind guess**: diagnose correctly on step 1 with zero investigation (penalized, scales with chain length)
-- **Wrong diagnosis**: investigate some services then diagnose wrong service/fault/remediation
-
-Every scenario produces different scores for the same play style. Scores differentiate by scenario complexity (service count, causal chain depth).
-
-Baseline results from `Qwen/Qwen3.5-27B` via HuggingFace router (2 runs, randomized scenarios):
-
-| Run | Task | Scenario | Score | Steps |
-|-----|------|----------|-------|-------|
-| 1 | easy | easy-cert-001 | 0.772 | 5 |
-| 1 | medium | medium-connleak-001 | 0.538 | 4 |
-| 1 | hard | hard-kafka-staleness-001 | 0.924 | 7 |
-| 2 | easy | easy-oom-001 | 0.748 | 3 |
-| 2 | medium | medium-config-001 | 0.750 | 6 |
-| 2 | hard | hard-network-blindspot-001 | 0.517 | 8 |
-
-The monitoring-blindness hard scenario (0.517) is significantly harder than the staleness scenario (0.924), showing genuine difficulty variance across scenarios.
-
 ## Running Inference
 
 ```bash
@@ -241,7 +305,7 @@ Output follows the mandatory `[START]`/`[STEP]`/`[END]` format:
 [START] task=easy env=incident_triage model=Qwen/Qwen3.5-27B
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
 [STEP] step=2 action=query_logs(auth-service) reward=0.05 done=false error=null
-[STEP] step=3 action=diagnose(auth-service,oom,restart) reward=1.00 done=true error=null
+[STEP] step=3 action=diagnose(auth-service,oom,restart,OutOfMemoryError at 10:14:5) reward=1.00 done=true error=null
 [END] success=true steps=3 score=1.000 rewards=0.02,0.05,1.00
 ```
 
@@ -253,7 +317,7 @@ The server uses `openenv create_app()` which provides HTTP, WebSocket, and MCP e
 # Health check
 curl http://localhost:8000/
 
-# Reset (start new episode)
+# Reset (start new episode -- generates fresh scenario)
 curl -X POST http://localhost:8000/reset \
   -H "Content-Type: application/json" \
   -d '{"task": "easy"}'
@@ -269,50 +333,45 @@ curl http://localhost:8000/metadata
 curl http://localhost:8000/schema
 ```
 
-WebSocket for multi-step episodes:
-
-```python
-from client import IncidentTriageEnvClient
-from models import IncidentAction
-
-with IncidentTriageEnvClient(base_url="http://localhost:8000") as env:
-    result = env.reset(task="easy")
-    result = env.step(IncidentAction(action_type="query_logs", target_service="auth-service"))
-    result = env.step(IncidentAction(
-        action_type="diagnose", target_service="auth-service",
-        fault_type="oom", remediation="restart",
-    ))
-```
-
 ## Project Structure
 
 ```
 incident-triage-env/
-├── models.py                    # Pydantic models (Action, Observation, Reward, Enums)
+├── models.py                    # Pydantic models (Action with hypothesis_evidence, Observation)
 ├── client.py                    # EnvClient for WebSocket connections
-├── inference.py                 # Baseline LLM agent
+├── inference.py                 # Baseline LLM agent with temporal-aware prompting
 ├── openenv.yaml                 # OpenEnv manifest
-├── pyproject.toml               # Dependencies
+├── pyproject.toml               # Dependencies (includes networkx)
 ├── incident_triage_env/
 │   ├── env.py                   # Core environment (reset/step/state)
-│   ├── grader.py                # Deterministic scoring
-│   ├── scenarios.py             # 8 scenarios across 3 difficulties (3+3+2)
+│   ├── generator.py             # ProceduralScenarioGenerator (networkx DAG topologies)
+│   ├── temporal.py              # TemporalSimulator (sigmoid degradation, causal delays)
+│   ├── grader.py                # Deterministic scoring with evidence bonus
+│   ├── scenarios.py             # Scenario accessor (delegates to generator)
 │   ├── real_incidents.py        # Real post-mortem mappings
 │   └── log_templates.py         # Realistic log generators (LogHub patterns)
 ├── server/
 │   ├── app.py                   # FastAPI server (create_app)
 │   ├── incident_triage_environment.py  # OpenEnv Environment adapter
 │   └── Dockerfile               # Multi-stage build
-├── tests/                       # 63 tests
+├── tests/                       # 148 tests
+│   ├── test_generator.py        # Generator structural validation (45 tests)
+│   ├── test_temporal.py         # Temporal degradation tests (15 tests)
+│   ├── test_env.py              # Core environment tests (40 tests)
+│   ├── test_grader.py           # Grading logic tests (22 tests)
+│   ├── test_scenarios.py        # Scenario pool tests (16 tests)
+│   └── test_api.py              # HTTP/WS endpoint tests (10 tests)
+├── docs/
+│   └── ARCHITECTURE.md          # Detailed architecture diagrams
 └── scripts/
-    ├── validate.sh              # Pre-submission validator (27 checks)
+    ├── validate.sh              # Pre-submission validator
     ├── run_baseline.sh          # Run inference with logging
     └── deploy_hf.sh             # Deploy to HuggingFace Spaces
 ```
 
 ## Real-World Sources
 
-All scenarios are grounded in documented production incidents:
+All fault patterns are grounded in documented production incidents:
 
 - [LogHub](https://github.com/logpai/loghub) -- real log templates from 16 distributed systems
 - [Dan Luu's post-mortems](https://github.com/danluu/post-mortems) -- 200+ real incident reports

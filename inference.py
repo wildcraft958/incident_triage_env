@@ -28,9 +28,19 @@ You have access to these actions (respond with JSON only):
 Valid fault types: oom, cpu_saturated, connection_leak, disk_full, config_error, network_partition, dependency_timeout, certificate_expired, memory_leak, thread_deadlock, dns_failure
 Valid remediations: restart, scale_up, fix_config, clear_disk, rollback, failover, increase_pool, renew_certificate, kill_threads, flush_dns, update_routes, resize_volume
 
-Investigate methodically. Query logs and metrics of suspicious services before diagnosing.
-When ready to diagnose, submit the diagnose action with your best assessment.
-Include hypothesis_evidence citing specific log timestamps or metric values that led to your conclusion.
+IMPORTANT: This environment simulates cascading failures that evolve over time.
+- Metrics degrade progressively (error rates climb, latency spikes, CPU saturates).
+- Logs reveal more evidence at later steps as the incident cascades through dependencies.
+- A service that looks healthy at step 1 may show critical failures by step 5.
+- If initial queries look normal, check topology for dependencies and re-investigate downstream services.
+
+Strategy:
+1. Check topology first to understand service dependencies.
+2. Query logs and metrics of services closest to the reported alert.
+3. Follow the dependency chain toward infrastructure (databases, message brokers, config services).
+4. If metrics look normal, the root cause may be deeper in the chain. Keep investigating.
+5. When diagnosing, include hypothesis_evidence citing specific log lines or metric values.
+
 Respond with ONLY valid JSON, no explanation."""
 
 
