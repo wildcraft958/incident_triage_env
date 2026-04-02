@@ -18,7 +18,7 @@ Built for the OpenEnv Hackathon (Scaler + HuggingFace + Meta).
 Every engineering team running microservices deals with production incidents. An SRE gets paged
 at 3am, opens dashboards, queries logs, checks which services depend on which, and tries to find
 the root cause before the outage gets worse. This is a high-stakes reasoning task that happens
-thousands of times a day across the industry -- and no RL environment exists to train or evaluate
+thousands of times a day across the industry, and no RL environment exists to train or evaluate
 agents on it.
 
 This environment changes that. Scenarios are built from documented real-world outages:
@@ -31,18 +31,15 @@ This environment changes that. Scenarios are built from documented real-world ou
 ## Setup
 
 ```bash
-pip install openenv-core
-pip install -r requirements.txt
-
-# Verify everything works
+uv sync
 openenv validate
-python -m pytest tests/ -v
+uv run python -m pytest tests/ -v
 ```
 
 ## Running Locally
 
 ```bash
-# Start server (recommended)
+# Start server
 uv run server
 
 # Or with uvicorn directly
@@ -55,36 +52,58 @@ INFERENCE_DRY_RUN=1 python inference.py
 ## Docker
 
 ```bash
-docker build -t incident-triage-env .
+docker build -f server/Dockerfile -t incident-triage-env .
 docker run -p 7860:7860 incident-triage-env
 ```
 
 ## Deploy to HuggingFace
 
 ```bash
+export HF_TOKEN=hf_your_token
 openenv push --repo-id your-username/incident-triage-env
 ```
 
 ## API
 
+The server exposes both HTTP and WebSocket endpoints via `openenv create_app()`.
+
+### HTTP (stateless, for single queries)
+
 ```bash
 # Health check
 curl http://localhost:7860/
 
-# Start episode
+# Reset (start new episode)
 curl -X POST http://localhost:7860/reset \
   -H "Content-Type: application/json" \
   -d '{"task": "easy"}'
 
-# Take a step
+# Step (stateless -- for multi-step use WebSocket)
 curl -X POST http://localhost:7860/step \
   -H "Content-Type: application/json" \
-  -d '{"session_id": "<sid>", "action": {"action_type": "check_topology"}}'
+  -d '{"action": {"action_type": "check_topology"}}'
 
-# Get state
-curl -X POST http://localhost:7860/state \
-  -H "Content-Type: application/json" \
-  -d '{"session_id": "<sid>"}'
+# State
+curl http://localhost:7860/state
+
+# Metadata
+curl http://localhost:7860/metadata
+
+# Schema
+curl http://localhost:7860/schema
+```
+
+### WebSocket (persistent sessions for multi-step episodes)
+
+```python
+from openenv.core import EnvClient
+from models import IncidentAction, IncidentObservation
+
+with EnvClient(base_url="http://localhost:7860") as client:
+    result = client.reset(task="easy")
+    result = client.step(IncidentAction(
+        action_type="query_logs", target_service="api-gateway"
+    ))
 ```
 
 ## Tasks
@@ -119,6 +138,7 @@ Repeated identical queries return `-0.01`. Invalid actions return `-0.02`.
 | `response` | string | Result of the last action (or action guide on reset) |
 | `step` | int | Current step number |
 | `done` | bool | Whether the episode has ended |
+| `reward` | float | Reward from the last action |
 | `score` | float | Final diagnosis score (0.0-1.0), non-zero only after diagnose |
 
 ## Scoring
@@ -148,13 +168,6 @@ Results from running `Qwen/Qwen3.5-27B` via HuggingFace router:
 | easy | 0.88 | 3 |
 | medium | 0.68 | 4 |
 | hard | 1.00 | 7 |
-
-Run your own baseline:
-
-```bash
-export HF_TOKEN=hf_your_token
-bash scripts/run_baseline.sh
-```
 
 ## Running Inference
 
