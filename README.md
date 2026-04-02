@@ -145,9 +145,9 @@ Results from running `Qwen/Qwen3.5-27B` via HuggingFace router:
 
 | Task | Score | Steps |
 |------|-------|-------|
-| easy | TBD | TBD |
-| medium | TBD | TBD |
-| hard | TBD | TBD |
+| easy | 0.88 | 3 |
+| medium | 0.68 | 4 |
+| hard | 1.00 | 7 |
 
 Run your own baseline:
 
