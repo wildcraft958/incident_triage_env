@@ -6,6 +6,7 @@ Logs are adapted from log_templates.py patterns to feel like real production out
 Incidents are grounded in real post-mortems tracked in real_incidents.py.
 """
 
+import random
 from typing import Dict, List
 
 
@@ -55,8 +56,10 @@ _easy_oom_001: Dict = {
         "user-db": [
             "2025-04-01T10:14:40Z [INFO] postgres: connection received: host=auth-service port=54312",
             "2025-04-01T10:14:41Z [INFO] postgres: connection authorized: user=auth database=users",
+            "2025-04-01T10:14:48Z [WARN] postgres: checkpoint request 3 seconds late (autovacuum contention)",
             "2025-04-01T10:14:50Z [INFO] postgres: Query executed in 3ms: SELECT * FROM sessions WHERE",
             "2025-04-01T10:15:00Z [INFO] postgres: Query executed in 4ms: SELECT * FROM users WHERE",
+            "2025-04-01T10:15:05Z [ERROR] postgres: could not open file 'pg_wal/tmp_xlog': No such file or directory (retry succeeded)",
             "2025-04-01T10:15:10Z [INFO] postgres: connection received: host=auth-service port=54318",
             "2025-04-01T10:15:11Z [INFO] postgres: connection authorized: user=auth database=users",
         ],
@@ -98,6 +101,22 @@ _easy_oom_001: Dict = {
             "service": "api-gateway",
             "message": "api-gateway error rate 95% (threshold: 5%)",
             "fired_at": "2025-04-01T10:15:05Z",
+        },
+        {
+            "name": "MarketingEmailLatency",
+            "severity": "warning",
+            "service": "marketing-email",
+            "message": "Send latency p95 > 2s",
+            "fired_at": "2025-04-01T10:10:00Z",
+            "status": "resolved",
+        },
+        {
+            "name": "AnalyticsBatchDelayed",
+            "severity": "warning",
+            "service": "analytics-batch",
+            "message": "Batch job delayed 5m",
+            "fired_at": "2025-04-01T10:08:00Z",
+            "status": "resolved",
         },
     ],
     "traces": {
@@ -154,9 +173,11 @@ _easy_disk_001: Dict = {
         ],
         "api-gateway": [
             "2025-04-01T10:03:18Z [INFO] gateway.Router: Routing POST /api/v1/login -> auth-service",
+            "2025-04-01T10:03:20Z [ERROR] http.Client: Connection reset by peer (retry 1/3 succeeded)",
             "2025-04-01T10:03:22Z [ERROR] gateway.Router: Upstream auth-service returned 500",
             "2025-04-01T10:03:23Z [WARN] gateway.CircuitBreaker: auth-service error rate above threshold: 80%",
             "2025-04-01T10:03:25Z [INFO] gateway.HealthCheck: Health check to auth-service: DEGRADED",
+            "2025-04-01T10:03:26Z [WARN] gc.G1: GC pause 195ms (within threshold)",
             "2025-04-01T10:03:28Z [INFO] gateway.Router: Routing GET /api/v1/profile -> auth-service",
             "2025-04-01T10:03:29Z [ERROR] gateway.Router: Upstream auth-service returned 500",
         ],
@@ -199,6 +220,22 @@ _easy_disk_001: Dict = {
             "service": "auth-service",
             "message": "auth-service error rate 98% (threshold: 5%)",
             "fired_at": "2025-04-01T10:03:22Z",
+        },
+        {
+            "name": "CDNEdgeCacheHitLow",
+            "severity": "warning",
+            "service": "cdn-edge",
+            "message": "Cache hit rate 78%",
+            "fired_at": "2025-04-01T09:55:00Z",
+            "status": "resolved",
+        },
+        {
+            "name": "LoggingPipelineBacklog",
+            "severity": "warning",
+            "service": "logging-pipeline",
+            "message": "Log ingestion backlog > 10k events",
+            "fired_at": "2025-04-01T09:48:00Z",
+            "status": "resolved",
         },
     ],
     "traces": {
@@ -243,6 +280,8 @@ _easy_cert_001: Dict = {
             "2025-04-01T09:30:02Z [ERROR] gateway.TLS: Peer certificate CN=auth-service expired at 2025-04-01T09:00:00Z",
             "2025-04-01T09:30:03Z [WARN] gateway.Router: Falling back to non-mTLS route (DENIED by security policy)",
             "2025-04-01T09:30:04Z [ERROR] gateway.Router: Cannot reach auth-service: TLS required by policy",
+            "2025-04-01T09:30:07Z [WARN] gc.G1: GC pause 160ms (within threshold)",
+            "2025-04-01T09:30:09Z [ERROR] http.Client: Connection reset by peer to user-service (retry 1/3 succeeded)",
             "2025-04-01T09:30:10Z [WARN] gateway.CircuitBreaker: auth-service error rate 65% (threshold: 10%)",
         ],
         "auth-service": [
@@ -253,8 +292,10 @@ _easy_cert_001: Dict = {
         ],
         "user-service": [
             "2025-04-01T09:30:00Z [INFO] service.Main: Processing requests normally",
+            "2025-04-01T09:30:04Z [ERROR] http.Client: Connection reset by peer to user-db replica (retry 1/3 succeeded)",
             "2025-04-01T09:30:05Z [INFO] service.Main: All upstream connections healthy",
             "2025-04-01T09:30:10Z [INFO] service.Metrics: request_rate=120/s error_rate=0%",
+            "2025-04-01T09:30:12Z [WARN] cache.Redis: Cache miss for key session:8821 (fallback to DB succeeded)",
         ],
         "cert-manager": [
             "2025-04-01T08:55:00Z [WARN] certmgr.Renewal: Certificate for auth-service expires in 5 minutes",
@@ -297,6 +338,22 @@ _easy_cert_001: Dict = {
             "service": "cert-manager",
             "message": "Certificate renewal failed for auth-service after 3 retries",
             "fired_at": "2025-04-01T09:00:01Z",
+        },
+        {
+            "name": "AnalyticsBatchDelayed",
+            "severity": "warning",
+            "service": "analytics-batch",
+            "message": "Batch job delayed 5m",
+            "fired_at": "2025-04-01T09:20:00Z",
+            "status": "resolved",
+        },
+        {
+            "name": "MarketingEmailLatency",
+            "severity": "warning",
+            "service": "marketing-email",
+            "message": "Send latency p95 > 2s",
+            "fired_at": "2025-04-01T09:15:00Z",
+            "status": "resolved",
         },
     ],
     "traces": {
@@ -388,8 +445,10 @@ _medium_connleak_001: Dict = {
         "payment-service": [
             "2025-04-01T09:55:00Z [INFO] service.payment-service: Processing request req_id=req-8810",
             "2025-04-01T09:55:01Z [INFO] service.payment-service: Request completed in 41ms",
+            "2025-04-01T09:56:12Z [ERROR] http.Client: Connection reset by peer to payment-gateway-ext (retry 1/3 succeeded)",
             "2025-04-01T09:58:00Z [INFO] service.payment-service: Service healthy -- all nominal",
             "2025-04-01T09:58:10Z [INFO] service.payment-service: Request completed in 38ms",
+            "2025-04-01T09:58:18Z [WARN] cache.Redis: Cache miss for key txn:idempotency:8821 (fallback to DB succeeded)",
             "2025-04-01T09:58:20Z [INFO] service.payment-service: Request completed in 43ms",
             "2025-04-01T09:58:30Z [INFO] service.payment-service: Health check: OK",
         ],
@@ -445,6 +504,22 @@ _medium_connleak_001: Dict = {
             "service": "postgres-db",
             "message": "postgres-db active connections 100/100 -- at max_connections",
             "fired_at": "2025-04-01T09:58:22Z",
+        },
+        {
+            "name": "CDNEdgeCacheHitLow",
+            "severity": "warning",
+            "service": "cdn-edge",
+            "message": "Cache hit rate 78%",
+            "fired_at": "2025-04-01T09:50:00Z",
+            "status": "resolved",
+        },
+        {
+            "name": "LoggingPipelineBacklog",
+            "severity": "warning",
+            "service": "logging-pipeline",
+            "message": "Log ingestion backlog > 10k events",
+            "fired_at": "2025-04-01T09:45:00Z",
+            "status": "resolved",
         },
     ],
     "traces": {
@@ -530,19 +605,23 @@ _medium_config_001: Dict = {
             "2025-04-01T10:22:15Z [ERROR] runtime.ServiceRunner: Restart failed -- config still invalid",
         ],
         "api-gateway": [
+            "2025-04-01T10:22:03Z [ERROR] http.Client: Connection reset by peer to metrics-backend (retry 1/3 succeeded)",
             "2025-04-01T10:22:05Z [ERROR] gateway.Router: Upstream worker-service-a returned 503",
             "2025-04-01T10:22:06Z [ERROR] gateway.Router: Upstream worker-service-b returned 503",
             "2025-04-01T10:22:07Z [WARN] gateway.CircuitBreaker: worker-service-a circuit breaker OPEN",
             "2025-04-01T10:22:07Z [WARN] gateway.CircuitBreaker: worker-service-b circuit breaker OPEN",
+            "2025-04-01T10:22:09Z [WARN] gc.G1: GC pause 170ms (within threshold)",
             "2025-04-01T10:22:10Z [INFO] gateway.HealthCheck: Health check to config-service: HEALTHY",
             "2025-04-01T10:22:11Z [INFO] gateway.HealthCheck: Health check to monitoring-service: HEALTHY",
         ],
         "monitoring-service": [
             "2025-04-01T10:22:00Z [INFO] service.monitoring-service: Health check: OK",
+            "2025-04-01T10:22:04Z [WARN] metrics.Exporter: Prometheus push failed (retry 1/2 succeeded)",
             "2025-04-01T10:22:05Z [INFO] service.monitoring-service: Scraping metrics from all services",
             "2025-04-01T10:22:06Z [INFO] service.monitoring-service: Config reload triggered -- version=2.4.7",
             "2025-04-01T10:22:06Z [INFO] service.monitoring-service: Applied config version=2.4.7: no breaking changes",
             "2025-04-01T10:22:07Z [INFO] service.monitoring-service: Request completed in 18ms",
+            "2025-04-01T10:22:18Z [ERROR] http.Client: Connection reset by peer to alertmanager (retry 1/3 succeeded)",
             "2025-04-01T10:22:20Z [INFO] service.monitoring-service: Service healthy -- all nominal",
         ],
     },
@@ -598,6 +677,22 @@ _medium_config_001: Dict = {
             "message": "worker-service-b crash loop detected -- 3 restarts in 2 min",
             "fired_at": "2025-04-01T10:22:10Z",
         },
+        {
+            "name": "MarketingEmailLatency",
+            "severity": "warning",
+            "service": "marketing-email",
+            "message": "Send latency p95 > 2s",
+            "fired_at": "2025-04-01T10:18:00Z",
+            "status": "resolved",
+        },
+        {
+            "name": "AnalyticsBatchDelayed",
+            "severity": "warning",
+            "service": "analytics-batch",
+            "message": "Batch job delayed 5m",
+            "fired_at": "2025-04-01T10:15:00Z",
+            "status": "resolved",
+        },
     ],
     "traces": {
         "trace-001": {
@@ -641,8 +736,10 @@ _medium_thunderherd_001: Dict = {
     "logs": {
         "load-balancer": [
             "2025-04-01T16:00:00Z [INFO] lb.Router: Traffic spike detected: 2400 rps (normal: 800 rps)",
+            "2025-04-01T16:00:02Z [ERROR] http.Client: Connection reset by peer to backend-pool-3 (retry 1/3 succeeded)",
             "2025-04-01T16:00:05Z [WARN] lb.HealthCheck: 3/10 worker instances unhealthy",
             "2025-04-01T16:05:00Z [WARN] lb.HealthCheck: 7/10 worker instances unhealthy",
+            "2025-04-01T16:07:30Z [WARN] gc.G1: GC pause 185ms (within threshold)",
             "2025-04-01T16:10:00Z [ERROR] lb.Router: Only 3 healthy backends, queuing requests",
             "2025-04-01T16:10:01Z [WARN] lb.Router: Request queue depth: 1200 (threshold: 100)",
         ],
@@ -724,6 +821,14 @@ _medium_thunderherd_001: Dict = {
             "service": "load-balancer",
             "message": "Request queue depth 1200 (threshold: 100)",
             "fired_at": "2025-04-01T16:10:01Z",
+        },
+        {
+            "name": "CDNEdgeCacheHitLow",
+            "severity": "warning",
+            "service": "cdn-edge",
+            "message": "Cache hit rate 78%",
+            "fired_at": "2025-04-01T15:40:00Z",
+            "status": "resolved",
         },
     ],
     "traces": {
@@ -940,6 +1045,22 @@ _hard_kafka_staleness_001: Dict = {
             "message": "Feature freshness SLA breached: last update 25 min ago (SLA: 5 min)",
             "fired_at": "2025-04-01T10:25:00Z",
         },
+        {
+            "name": "MarketingEmailLatency",
+            "severity": "warning",
+            "service": "marketing-email",
+            "message": "Send latency p95 > 2s",
+            "fired_at": "2025-04-01T10:00:00Z",
+            "status": "resolved",
+        },
+        {
+            "name": "LoggingPipelineBacklog",
+            "severity": "warning",
+            "service": "logging-pipeline",
+            "message": "Log ingestion backlog > 10k events",
+            "fired_at": "2025-04-01T09:55:00Z",
+            "status": "resolved",
+        },
     ],
     "traces": {
         "trace-001": {
@@ -1103,6 +1224,14 @@ _hard_network_blindspot_001: Dict = {
             "message": "No metric data received for 5+ services in last 10 minutes",
             "fired_at": "2025-04-01T11:10:00Z",
         },
+        {
+            "name": "AnalyticsBatchDelayed",
+            "severity": "warning",
+            "service": "analytics-batch",
+            "message": "Batch job delayed 5m",
+            "fired_at": "2025-04-01T10:55:00Z",
+            "status": "resolved",
+        },
     ],
     "traces": {
         "trace-net-001": {
@@ -1123,12 +1252,13 @@ HARD_SCENARIOS: List[Dict] = [_hard_kafka_staleness_001, _hard_network_blindspot
 # Scenario accessor
 # ----------------------------------------------------------------------
 
-def get_scenario(task: str, index: int = 0) -> dict:
-    """Return a scenario dict by difficulty task and index.
+def get_scenario(task: str, index: int | None = None) -> dict:
+    """Return a scenario dict by difficulty task and optional index.
 
     Args:
         task: One of "easy", "medium", or "hard".
         index: Which scenario in the pool to return. Wraps around if out of range.
+               When None, a scenario is chosen randomly.
 
     Raises:
         ValueError: If task is not a known difficulty level.
@@ -1137,4 +1267,6 @@ def get_scenario(task: str, index: int = 0) -> dict:
     if task not in pools:
         raise ValueError(f"Unknown task '{task}'. Must be one of: easy, medium, hard")
     pool = pools[task]
+    if index is None:
+        return random.choice(pool)
     return pool[index % len(pool)]
