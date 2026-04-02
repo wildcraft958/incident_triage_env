@@ -181,6 +181,85 @@ class TestRewardSignals:
         assert done is True
 
 
+class TestBlindPenaltyExploit:
+    """Repeated identical actions must not bypass blind diagnosis penalty."""
+
+    def test_repeated_topology_does_not_bypass_penalty(self):
+        """Spamming check_topology 3x should still trigger blind penalty."""
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+        # Spam the same action 3 times -- only 1 unique investigation
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="check_topology"))
+        _, score_spammed, _, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+
+        # Proper investigation: 3 unique actions
+        env2 = IncidentTriageEnv(task="easy")
+        env2.scenario = env.scenario  # Same scenario for fair comparison
+        env2.step_count = 0
+        env2.done = False
+        env2.score = 0.0
+        env2.history = []
+        env2.queried_actions = set()
+        env2.step(IncidentAction(action_type="check_topology"))
+        env2.step(IncidentAction(action_type="query_logs", target_service=gt["service"]))
+        env2.step(IncidentAction(action_type="query_metrics", target_service=gt["service"]))
+        _, score_proper, _, _ = env2.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+
+        # Proper investigation must score higher than spam exploit
+        assert score_proper > score_spammed
+
+    def test_spam_counted_as_single_unique_investigation(self):
+        """3 identical check_topology calls = 1 unique investigation for blind penalty."""
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+
+        # Immediate diagnosis (0 investigation)
+        env_zero = IncidentTriageEnv(task="easy")
+        env_zero.scenario = env.scenario
+        env_zero.step_count = 0
+        env_zero.done = False
+        env_zero.score = 0.0
+        env_zero.history = []
+        env_zero.queried_actions = set()
+        _, score_zero, _, _ = env_zero.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+
+        # Spam topology 3x then diagnose (1 unique investigation)
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="check_topology"))
+        _, score_spam, _, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+
+        # Spam should score higher than zero (1 unique > 0 unique)
+        # but the gap should be small since it's only 1 unique investigation
+        assert score_spam > score_zero
+        # Score difference between 0 and 1 unique investigation should be modest
+        assert (score_spam - score_zero) < 0.15
+
+
 class TestMonitoringBlindness:
     """Hard scenarios may have stale/missing metrics."""
 

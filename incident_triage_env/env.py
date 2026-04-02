@@ -194,17 +194,17 @@ class IncidentTriageEnv:
         response = "\n".join(lines) if lines else "No topology data available."
         return response, 0.02
 
-    def _do_query_logs(self, service: str) -> tuple[str, float]:
+    def _do_query_logs(self, service: str, max_lines: int = 50) -> tuple[str, float]:
         if service not in self.scenario.get("services", []):
             return f"Error: service '{service}' not found.", -0.02
 
         key = ("query_logs", service)
         if key in self.queried_actions:
-            logs = self.scenario.get("logs", {}).get(service, [])
+            logs = self.scenario.get("logs", {}).get(service, [])[-max_lines:]
             return "\n".join(logs) if logs else f"No logs for {service}.", -0.01
 
         self.queried_actions.add(key)
-        logs = self.scenario.get("logs", {}).get(service, [])
+        logs = self.scenario.get("logs", {}).get(service, [])[-max_lines:]
         response = "\n".join(logs) if logs else f"No logs available for {service}."
 
         causal_chain = self.scenario.get("causal_chain", [])
@@ -300,11 +300,13 @@ class IncidentTriageEnv:
 
         # Blind diagnosis penalty: penalize agents that skip investigation
         # Scales with causal chain length -- harder scenarios need more investigation
-        investigation_steps = sum(
-            1 for h in self.history
+        # Count unique (action, service) pairs to prevent exploit via repeated identical actions
+        investigation_steps = len({
+            (h["action"], h.get("target_service"))
+            for h in self.history
             if h["action"] in ("query_logs", "query_metrics", "trace_request",
                                "check_alerts", "check_topology")
-        )
+        })
         chain_len = len(self.scenario.get("causal_chain", []))
         chain_factor = min(chain_len / 3.0, 1.5)  # 1-chain=0.33, 3-chain=1.0, 5-chain=1.5
         blind_penalty = 0.0

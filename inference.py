@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -101,6 +102,11 @@ def run_llm_action(client: OpenAI, messages: list[dict]) -> IncidentAction:
     if raw.startswith("```"):
         lines = raw.splitlines()
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+    # Extract first JSON object if LLM added preamble/postamble text
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if match:
+        raw = match.group(0)
 
     data = json.loads(raw)
     # Filter to known fields only -- Action base class forbids extras
