@@ -292,18 +292,18 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 
 ## Baseline Results
 
-Real baseline from `Qwen/Qwen3.5-27B` via HuggingFace router against the procedural generation engine:
+Real baseline from `anthropic/claude-haiku-4-5` against the procedural generation engine:
 
 | Task | Scenario | Score | Steps | Key Behavior |
 |------|----------|-------|-------|-------------|
-| easy | easy-gen-disk_full-d97f | **0.979** | 9 | Re-queried postgres-db at steps 6 and 8 after watching disk_usage_pct climb via temporal degradation. Cited exact metric values in evidence. |
-| medium | medium-gen-connection_leak | **0.927** | 20 | Survived 11 consecutive API 402 errors mid-episode without crashing. Recovered and correctly diagnosed cassandra-db connection_leak with log evidence. |
-| hard | hard-gen-disk_full | **0.877** | 6 | Traced kafka-broker disk_full in just 6 steps. Cited "Disk usage: 97%" from logs in hypothesis_evidence. |
+| easy | easy-gen-certificate_expired | **0.960** | 10 | Checked alerts first, then systematically investigated config-service via logs, metrics, and traces. Cited specific error log lines in evidence. |
+| medium | medium-gen-cpu_saturated | **0.970** | 10 | Investigated all 3 causal chain services (kafka-broker, search-service, profile-service) with cross-referencing. Correctly identified kafka-broker as root cause. |
+| hard | hard-gen-memory_leak | **0.930** | 10 | Traced 5-service topology, cross-referenced logs and metrics for dns-resolver and inventory-service. Cited "Heap memory at 97% (3.9GB/4.0GB)" in evidence. |
 
 Notable behaviors observed:
-- **Temporal awareness**: The agent re-queried services it had already checked because metrics were evolving between steps, proving the sigmoid degradation curves force adaptive investigation.
-- **Evidence citation**: All three diagnoses included specific log timestamps and metric values in `hypothesis_evidence`, earning the evidence bonus.
-- **Error resilience**: The inference loop gracefully handled external API failures without corrupting the environment state or stdout format.
+- **Methodical investigation**: The agent consistently checked topology early, then cross-referenced logs and metrics for the same service, earning high investigation quality scores.
+- **Evidence citation**: All three diagnoses included specific log lines and metric values in `hypothesis_evidence`, earning the evidence bonus.
+- **Causal chain coverage**: On medium and hard tasks, the agent investigated multiple services in the causal chain before diagnosing, avoiding the blind diagnosis penalty.
 
 ## Running Inference
 
@@ -317,13 +317,13 @@ python inference.py
 Output follows the mandatory `[START]`/`[STEP]`/`[END]` format:
 
 ```
-[START] task=easy env=incident_triage model=Qwen/Qwen3.5-27B
-[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(postgres-db) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(postgres-db) reward=0.05 done=false error=null
+[START] task=easy env=incident_triage model=anthropic/claude-haiku-4-5-20251001
+[STEP] step=1 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=2 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=3 action=query_logs(api-gateway) reward=0.00 done=false error=null
 ...
-[STEP] step=9 action=diagnose(postgres-db,disk_full,clear_disk,Metrics show disk_usage_pct increased from 50.8% t) reward=0.98 done=true error=null
-[END] success=true steps=9 score=0.979 rewards=0.02,0.03,0.05,0.03,0.05,-0.01,0.03,-0.01,0.98
+[STEP] step=10 action=diagnose(config-service,certificate_expired,renew_certificate,config-service logs show [ERROR]...) reward=0.96 done=true error=null
+[END] success=true steps=10 rewards=0.03,0.02,0.00,0.00,0.05,0.03,0.00,0.00,0.04,0.96
 ```
 
 ## API
