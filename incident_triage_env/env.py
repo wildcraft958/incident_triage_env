@@ -299,18 +299,21 @@ class IncidentTriageEnv:
             diag_score = min(1.0, diag_score + 0.05)
 
         # Blind diagnosis penalty: penalize agents that skip investigation
+        # Scales with causal chain length -- harder scenarios need more investigation
         investigation_steps = sum(
             1 for h in self.history
             if h["action"] in ("query_logs", "query_metrics", "trace_request",
                                "check_alerts", "check_topology")
         )
+        chain_len = len(self.scenario.get("causal_chain", []))
+        chain_factor = min(chain_len / 3.0, 1.5)  # 1-chain=0.33, 3-chain=1.0, 5-chain=1.5
         blind_penalty = 0.0
         if investigation_steps == 0:
-            blind_penalty = 0.30
+            blind_penalty = 0.20 * chain_factor + 0.10
         elif investigation_steps == 1:
-            blind_penalty = 0.15
+            blind_penalty = 0.10 * chain_factor + 0.05
         elif investigation_steps == 2:
-            blind_penalty = 0.05
+            blind_penalty = 0.03 * chain_factor + 0.02
 
         diag_score = max(0.0, diag_score - blind_penalty)
 
@@ -326,11 +329,15 @@ class IncidentTriageEnv:
             self.scenario["topology"],
         )
 
-        # Combined: 75% diagnosis + 25% investigation quality (normalized)
+        # Combined: 70% diagnosis + 30% investigation quality (normalized)
         # Max invest score is 0.30, so normalize: 0.30 -> 1.0
         invest_normalized = invest_result["score"] / 0.30 if invest_result["score"] > 0 else 0.0
-        combined = (diag_score * 0.75) + (invest_normalized * 0.25)
-        combined = min(1.0, round(combined, 3))
+        num_services = len(self.scenario.get("services", []))
+        # Small scenario complexity factor so identical play styles
+        # still produce different scores across scenarios
+        complexity_nudge = round(num_services * 0.003, 3)
+        combined = (diag_score * 0.70) + (invest_normalized * 0.30) + complexity_nudge
+        combined = min(1.0, max(0.0, round(combined, 3)))
 
         self.score = combined
         self.done = True

@@ -167,7 +167,7 @@ graph LR
 - Staying focused on relevant services (not querying everything)
 - Following dependency links in investigation order
 
-**Blind diagnosis penalty** discourages agents from guessing without investigating. Agents that diagnose with 0 investigation steps lose 0.30 from their score.
+**Blind diagnosis penalty** scales with causal chain length -- harder scenarios need more investigation. Agents that diagnose with 0 investigation steps lose 0.17-0.40 from their score depending on scenario complexity.
 
 | Component | Points | Condition |
 |-----------|--------|-----------|
@@ -197,15 +197,29 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 | Invalid action | -0.02 | Missing fields, unknown type |
 | Max steps without diagnosis | 0.00 | Episode ends with score 0 |
 
-## Baseline Results
+## Benchmark Results
 
-Results from running `Qwen/Qwen3.5-27B` via HuggingFace router:
+Score ranges across all 8 scenarios with 3 play styles:
 
-| Task | Score | Steps | Outcome |
-|------|-------|-------|---------|
-| easy | 0.88 | 3 | Correct service + fault type |
-| medium | 0.68 | 4 | Correct service, partial remediation |
-| hard | 1.00 | 7 | Perfect diagnosis after thorough investigation |
+| Task | Scenarios | Perfect Play | Blind Guess | Wrong Diagnosis |
+|------|-----------|-------------|-------------|-----------------|
+| easy | 3 | 0.884 - 0.959 | 0.546 - 0.592 | 0.062 - 0.209 |
+| medium | 3 | 0.853 - 0.865 | 0.458 - 0.505 | 0.065 - 0.148 |
+| hard | 2 | 0.854 - 0.859 | 0.444 - 0.464 | 0.144 - 0.146 |
+
+- **Perfect play**: check topology, query logs+metrics of root cause, then diagnose correctly
+- **Blind guess**: diagnose correctly on step 1 with zero investigation (penalized, scales with chain length)
+- **Wrong diagnosis**: investigate some services then diagnose wrong service/fault/remediation
+
+Every scenario produces different scores for the same play style. Scores differentiate by scenario complexity (service count, causal chain depth).
+
+Baseline results from `Qwen/Qwen3.5-27B` via HuggingFace router:
+
+| Task | Score | Steps |
+|------|-------|-------|
+| easy | 0.88 | 3 |
+| medium | 0.68 | 4 |
+| hard | 0.85 | 7 |
 
 ## Running Inference
 

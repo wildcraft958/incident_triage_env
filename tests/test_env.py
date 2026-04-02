@@ -177,7 +177,7 @@ class TestRewardSignals:
             fault_type="wrong",
             remediation="wrong",
         ))
-        assert r == 0.0
+        assert r < 0.05
         assert done is True
 
 

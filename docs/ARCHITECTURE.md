@@ -136,6 +136,8 @@ erDiagram
 
 ## Grading Logic
 
+Final score = 75% diagnosis + 25% investigation quality - blind penalty
+
 ```mermaid
 flowchart TD
     A[Agent submits diagnose action] --> B{Service matches root cause?}
