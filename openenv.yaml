@@ -1,0 +1,126 @@
+name: incident-triage-env
+version: "1.0"
+description: >
+  SRE Incident Triage RL Environment. An AI agent investigates microservice
+  incidents by querying logs, metrics, topology, traces, and alerts, then
+  submits a root-cause diagnosis. Based on real production outages from Meta,
+  AWS, CrowdStrike, GitHub, and Slack post-mortems.
+
+author: Animesh Raj <animeshraj958@gmail.com>
+license: MIT
+
+tasks:
+  - name: easy
+    description: Single-service failure with clear error signals. Baseline agents score 0.75+.
+  - name: medium
+    description: Cascading failure with 2-3 service causal chain. Moderate investigation needed.
+  - name: hard
+    description: Subtle degradation across 5 services with no application-layer errors.
+
+action_space:
+  type: discrete
+  actions:
+    - name: query_logs
+      description: Retrieve recent log lines from a specific service
+      parameters:
+        - name: target_service
+          type: string
+          required: true
+    - name: query_metrics
+      description: Retrieve current metrics for a specific service
+      parameters:
+        - name: target_service
+          type: string
+          required: true
+    - name: check_topology
+      description: View the full service dependency graph
+      parameters: []
+    - name: trace_request
+      description: Follow a sample request through the service mesh
+      parameters:
+        - name: target_service
+          type: string
+          required: false
+    - name: check_alerts
+      description: View active alerts and alert history
+      parameters: []
+    - name: diagnose
+      description: Submit a root-cause diagnosis to end the episode
+      parameters:
+        - name: target_service
+          type: string
+          required: true
+        - name: fault_type
+          type: string
+          required: true
+          enum:
+            - oom
+            - cpu_saturated
+            - connection_leak
+            - disk_full
+            - config_error
+            - network_partition
+            - dependency_timeout
+            - certificate_expired
+            - memory_leak
+            - thread_deadlock
+            - dns_failure
+        - name: remediation
+          type: string
+          required: true
+          enum:
+            - restart
+            - scale_up
+            - fix_config
+            - clear_disk
+            - rollback
+            - failover
+            - increase_pool
+            - renew_certificate
+            - kill_threads
+            - flush_dns
+            - update_routes
+            - resize_volume
+
+observation_space:
+  type: dict
+  fields:
+    - name: incident_id
+      type: string
+    - name: summary
+      type: string
+    - name: available_services
+      type: list[string]
+    - name: response
+      type: string
+    - name: step
+      type: integer
+    - name: done
+      type: boolean
+    - name: score
+      type: float
+
+reward_range: [0.0, 1.0]
+max_steps: 15
+
+api:
+  base_url: http://localhost:7860
+  endpoints:
+    - method: GET
+      path: /
+      description: Health check
+    - method: GET
+      path: /health
+      description: Detailed health status
+    - method: GET
+      path: /tasks
+      description: List available tasks
+    - method: POST
+      path: /reset
+      description: Start a new episode
+    - method: POST
+      path: /step
+      description: Take an action
+    - method: POST
+      path: /state
+      description: Get full environment state
