@@ -290,6 +290,21 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 | Invalid action | -0.02 | Missing fields, unknown type |
 | Max steps without diagnosis | 0.00 | Episode ends with score 0 |
 
+## Baseline Results
+
+Real baseline from `Qwen/Qwen3.5-27B` via HuggingFace router against the procedural generation engine:
+
+| Task | Scenario | Score | Steps | Key Behavior |
+|------|----------|-------|-------|-------------|
+| easy | easy-gen-disk_full-d97f | **0.979** | 9 | Re-queried postgres-db at steps 6 and 8 after watching disk_usage_pct climb via temporal degradation. Cited exact metric values in evidence. |
+| medium | medium-gen-connection_leak | **0.927** | 20 | Survived 11 consecutive API 402 errors mid-episode without crashing. Recovered and correctly diagnosed cassandra-db connection_leak with log evidence. |
+| hard | hard-gen-disk_full | **0.877** | 6 | Traced kafka-broker disk_full in just 6 steps. Cited "Disk usage: 97%" from logs in hypothesis_evidence. |
+
+Notable behaviors observed:
+- **Temporal awareness**: The agent re-queried services it had already checked because metrics were evolving between steps, proving the sigmoid degradation curves force adaptive investigation.
+- **Evidence citation**: All three diagnoses included specific log timestamps and metric values in `hypothesis_evidence`, earning the evidence bonus.
+- **Error resilience**: The inference loop gracefully handled external API failures without corrupting the environment state or stdout format.
+
 ## Running Inference
 
 ```bash
@@ -304,9 +319,11 @@ Output follows the mandatory `[START]`/`[STEP]`/`[END]` format:
 ```
 [START] task=easy env=incident_triage model=Qwen/Qwen3.5-27B
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_logs(auth-service) reward=0.05 done=false error=null
-[STEP] step=3 action=diagnose(auth-service,oom,restart,OutOfMemoryError at 10:14:5) reward=1.00 done=true error=null
-[END] success=true steps=3 score=1.000 rewards=0.02,0.05,1.00
+[STEP] step=2 action=query_metrics(postgres-db) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(postgres-db) reward=0.05 done=false error=null
+...
+[STEP] step=9 action=diagnose(postgres-db,disk_full,clear_disk,Metrics show disk_usage_pct increased from 50.8% t) reward=0.98 done=true error=null
+[END] success=true steps=9 score=0.979 rewards=0.02,0.03,0.05,0.03,0.05,-0.01,0.03,-0.01,0.98
 ```
 
 ## API
