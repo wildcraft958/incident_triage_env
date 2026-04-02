@@ -40,14 +40,14 @@ print('All smoke tests passed!')"
 # --- Docker ---------------------------------------------------------
 
 docker-build:
-	docker build -t incident-triage-env .
+	docker build -f server/Dockerfile -t incident-triage-env .
 
 docker-run:
-	docker run -p 8000:8000 incident-triage-env
+	docker run -p 8000:8000 -e PORT=8000 incident-triage-env
 
 docker-test: docker-build
 	@echo "=== Docker Test ==="
-	docker run -d --name ite-test -p 8000:8000 incident-triage-env
+	docker run -d --name ite-test -p 8000:8000 -e PORT=8000 incident-triage-env
 	sleep 3
 	curl -sf http://localhost:8000/ && echo " Health check passed" || echo " Health check failed"
 	curl -sf -X POST http://localhost:8000/reset \
@@ -89,7 +89,7 @@ r = grade_diagnosis('x', 'y', 'z', {'service':'x','fault_type':'y','remediation'
 assert r['score'] == 1.0; \
 print('  Grader range: 0.0-1.0, perfect score works')"
 	@echo "4. Testing Docker build..."
-	docker build -t incident-triage-env . > /dev/null 2>&1 && echo "  Docker builds" || echo "  Docker build failed"
+	docker build -f server/Dockerfile -t incident-triage-env . > /dev/null 2>&1 && echo "  Docker builds" || echo "  Docker build failed"
 	@echo "=== All validations passed ==="
 
 # --- Clean ----------------------------------------------------------
