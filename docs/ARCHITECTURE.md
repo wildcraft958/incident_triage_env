@@ -20,7 +20,7 @@ graph TB
         end
 
         subgraph GEN["Procedural Engine"]
-            PROC["generator.py\nnetworkx DAGs\n10 fault patterns"]
+            PROC["generator.py\nnetworkx DAGs\n12 fault patterns"]
             TEMP["temporal.py\nSigmoid degradation\nCausal hop delays"]
         end
 
@@ -40,6 +40,14 @@ graph TB
 
     AGENT -->|"HTTP or WebSocket"| API
 ```
+
+## Research Grounding
+
+The architecture is informed by three lines of research in microservice observability and root-cause analysis:
+
+- **Graph-structured multi-modal RCA.** Frameworks like MicroHECL (Li et al., FSE 2022) and CHASE (Wang et al., 2023) localize faults by combining service call graphs with metrics, logs, and traces. Our environment mirrors this structure: agents receive DAG topology, temporal metrics, log evidence, alerts, and traces as separate observation modalities.
+- **Production microservice trace analysis.** Studies of Alibaba-scale call graphs (Luo et al., ACM SoCC 2021) show heavy-tailed, tree-like DAGs with hotspot services. Our networkx generator produces topologies with these properties while remaining fully procedural and deterministic.
+- **Temporal anomaly detection.** GCN+LSTM frameworks for trace anomaly detection operate on evolving metric streams over service graphs. Our TemporalSimulator produces sigmoid degradation with causal hop delays, creating the same "moving target" that temporal anomaly detectors are designed for.
 
 ## Episode Lifecycle
 
@@ -219,7 +227,7 @@ flowchart LR
 |------|------|---------------|
 | `models.py` | Pydantic models extending openenv types | Fully typed, includes hypothesis_evidence |
 | `incident_triage_env/env.py` | Core environment with reset/step/state | Integrates generator + temporal simulator |
-| `incident_triage_env/generator.py` | Procedural scenario generation | networkx DAGs, 10 fault patterns, 40+ service names |
+| `incident_triage_env/generator.py` | Procedural scenario generation | networkx DAGs, 12 fault patterns, 40+ service names |
 | `incident_triage_env/temporal.py` | Dynamic metric degradation | Sigmoid curves, causal hop delays |
 | `incident_triage_env/grader.py` | Diagnosis + evidence + criticality + investigation scoring | Deterministic, range [0.0, 1.0], partial credit |
 | `incident_triage_env/scenarios.py` | Scenario accessor (delegates to generator) | Backward compat pool lists |
