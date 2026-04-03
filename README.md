@@ -142,7 +142,7 @@ Service dependency graphs are generated as Directed Acyclic Graphs using `networ
 | medium | 4-6 | Fanout with bottleneck | 2-4 deep | Cascading failure, red-herring bystanders |
 | hard | 6-9 | Deep tree, multiple paths | 3-5 deep | Monitoring blindness, stale metrics |
 
-### 10 Fault Patterns
+### 12 Fault Patterns
 
 Each pattern defines a fault type, remediation, log category, metric signature, and cascade behavior:
 
@@ -158,6 +158,8 @@ Each pattern defines a fault type, remediation, log category, metric signature, 
 | dns-failure | dns_failure | flush_dns | error_propagation | Meta 2021 BGP outage |
 | memory-leak | memory_leak | restart | timeout | Gradual heap exhaustion |
 | thread-deadlock | thread_deadlock | kill_threads | timeout | Thread pool starvation |
+| network-partition | network_partition | update_routes | error_propagation | Cloud split-brain scenarios |
+| dependency-timeout | dependency_timeout | failover | timeout | Service mesh cascade stalls |
 
 ### Infinite Replayability
 

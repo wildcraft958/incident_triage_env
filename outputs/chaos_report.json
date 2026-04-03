@@ -1,24 +1,60 @@
 {
   "config": {
-    "episodes": 5,
+    "episodes": 20,
     "task": "hard",
     "model": "Qwen/Qwen3.5-27B",
-    "dry_run": false
+    "dry_run": true
   },
   "summary": {
     "win_rate": 1.0,
-    "avg_score": 0.856,
-    "avg_steps": 5.8,
-    "min_score": 0.801,
-    "max_score": 0.899
+    "avg_score": 0.849,
+    "avg_steps": 7.0,
+    "min_score": 0.847,
+    "max_score": 0.85
   },
   "defects": {
     "loop_defect_rate": 0.0,
-    "evidence_hallucination_rate": 0.0,
+    "evidence_hallucination_rate": 0.35,
     "context_saturation_rate": 0.0,
-    "blind_guess_rate": 0.2,
-    "total_parse_errors": 5
+    "blind_guess_rate": 0.0,
+    "total_parse_errors": 0
   },
   "catastrophic_failures": [],
-  "hallucination_details": []
+  "hallucination_details": [
+    {
+      "episode": 5,
+      "scenario_id": "hard-gen-memory_leak-eee3",
+      "details": "Cited numbers not in env responses: {'95'}"
+    },
+    {
+      "episode": 13,
+      "scenario_id": "hard-gen-thread_deadlock-db43",
+      "details": "Cited numbers not in env responses: {'95'}"
+    },
+    {
+      "episode": 14,
+      "scenario_id": "hard-gen-disk_full-8dec",
+      "details": "Cited numbers not in env responses: {'95'}"
+    },
+    {
+      "episode": 15,
+      "scenario_id": "hard-gen-dns_failure-039b",
+      "details": "Cited numbers not in env responses: {'95'}"
+    },
+    {
+      "episode": 11,
+      "scenario_id": "hard-gen-dns_failure-afb9",
+      "details": "Cited numbers not in env responses: {'95'}"
+    },
+    {
+      "episode": 16,
+      "scenario_id": "hard-gen-thread_deadlock-0d76",
+      "details": "Cited numbers not in env responses: {'95'}"
+    },
+    {
+      "episode": 17,
+      "scenario_id": "hard-gen-disk_full-7835",
+      "details": "Cited numbers not in env responses: {'95'}"
+    }
+  ]
 }

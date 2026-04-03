@@ -165,11 +165,37 @@ FAULT_PATTERNS: list[FaultPattern] = [
         ],
         root_service_layer="application",
     ),
+    FaultPattern(
+        name="network-partition",
+        fault_type="network_partition",
+        remediation="update_routes",
+        log_category="generic",
+        root_metric_signature={"cpu_pct": 10.0, "memory_pct": 35.0, "error_rate_pct": 50.0, "latency_p99_ms": 15000.0, "requests_per_sec": 25.0},
+        cascade_effect="error_propagation",
+        summary_templates=[
+            "ALERT: Split-brain detected. {root_service} unreachable from half the cluster.",
+            "ALERT: P1 -- Network partition isolating {root_service}. Inconsistent responses across replicas.",
+        ],
+        root_service_layer="infrastructure",
+    ),
+    FaultPattern(
+        name="dependency-timeout",
+        fault_type="dependency_timeout",
+        remediation="failover",
+        log_category="generic",
+        root_metric_signature={"cpu_pct": 8.0, "memory_pct": 40.0, "error_rate_pct": 70.0, "latency_p99_ms": 20000.0, "requests_per_sec": 10.0},
+        cascade_effect="timeout",
+        summary_templates=[
+            "ALERT: {root_service} upstream dependency not responding. Cascading timeouts across service mesh.",
+            "ALERT: P1 -- Dependency chain stalled at {root_service}. Downstream services queuing requests.",
+        ],
+        root_service_layer="infrastructure",
+    ),
 ]
 
 EASY_PATTERNS = [p for p in FAULT_PATTERNS if p.name in ("java-oom", "disk-full-db", "cert-expired")]
-MEDIUM_PATTERNS = [p for p in FAULT_PATTERNS if p.name in ("connection-leak", "config-push", "thundering-herd")]
-HARD_PATTERNS = [p for p in FAULT_PATTERNS if p.name in ("disk-full-kafka", "dns-failure", "memory-leak", "thread-deadlock")]
+MEDIUM_PATTERNS = [p for p in FAULT_PATTERNS if p.name in ("connection-leak", "config-push", "thundering-herd", "network-partition")]
+HARD_PATTERNS = [p for p in FAULT_PATTERNS if p.name in ("disk-full-kafka", "dns-failure", "memory-leak", "thread-deadlock", "dependency-timeout")]
 
 
 # ------------------------------------------------------------------

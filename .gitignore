@@ -31,6 +31,9 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# Runtime logs (regenerated on each run)
+logs/episodes/
+
 # Claude Code
 .claude/
 CLAUDE.md

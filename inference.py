@@ -9,6 +9,7 @@ from typing import Any
 from openai import OpenAI
 
 from incident_triage_env.env import IncidentTriageEnv
+from incident_triage_env.logger import EpisodeLogger
 from models import IncidentAction
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
@@ -149,8 +150,12 @@ def run_episode(task: str) -> None:
     if not DRY_RUN:
         client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "dummy")
 
+    session_id = f"{task}-{MODEL_NAME.replace('/', '-')}"
+    episode_log = EpisodeLogger(session_id, task)
+
     try:
         obs = env.reset()
+        episode_log.log_reset(obs)
 
         if DRY_RUN:
             action_queue = dry_run_actions(obs)
@@ -203,6 +208,7 @@ def run_episode(task: str) -> None:
             rewards.append(reward)
             error_val = info.get("error") if info else None
             print_step(steps, action, reward, done, error_val)
+            episode_log.log_step(action, obs, reward, done)
 
             if not DRY_RUN:
                 # Add assistant turn (the action JSON) and next observation
@@ -219,6 +225,7 @@ def run_episode(task: str) -> None:
     finally:
         final_score = env.score if env else 0.0
         env.close()
+        episode_log._flush()
         print_end(success, steps, rewards)
 
 
