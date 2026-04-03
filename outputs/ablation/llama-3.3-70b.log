@@ -1,26 +1,27 @@
 [START] task=easy env=incident_triage model=groq/llama-3-3-70b-versatile
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_logs(order-service) reward=0.05 done=false error=null
-[STEP] step=3 action=query_metrics(order-service) reward=0.03 done=false error=null
-[STEP] step=4 action=query_logs(mongo-db) reward=0.00 done=false error=null
-[STEP] step=5 action=query_metrics(mongo-db) reward=0.00 done=false error=null
-[STEP] step=6 action=query_logs(grpc-gateway) reward=0.00 done=false error=null
-[STEP] step=7 action=diagnose(order-service,memory_leak,restart,2025-04-01T10:11:00Z [WARN] gc.GarbageCollector: G) reward=0.76 done=true error=null
-[END] success=true steps=7 rewards=0.02,0.05,0.03,0.00,0.00,0.00,0.76
+[STEP] step=2 action=query_logs(auth-service) reward=0.05 done=false error=null
+[STEP] step=3 action=query_metrics(auth-service) reward=0.03 done=false error=null
+[STEP] step=4 action=query_logs(cassandra-db) reward=0.00 done=false error=null
+[STEP] step=5 action=check_runbook(auth-service) reward=0.02 done=false error=null
+[STEP] step=6 action=diagnose(auth-service,memory_leak,restart,GC pause (G1 Evacuation Pause) 2407ms -- heap 3.8G) reward=0.78 done=true error=null
+[END] success=true steps=6 rewards=0.02,0.05,0.03,0.00,0.02,0.78
 [START] task=medium env=incident_triage model=groq/llama-3-3-70b-versatile
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_logs(cassandra-db) reward=0.05 done=false error=null
+[STEP] step=3 action=query_metrics(cassandra-db) reward=0.03 done=false error=null
+[STEP] step=4 action=query_logs(inventory-service) reward=0.05 done=false error=null
+[STEP] step=5 action=query_logs(profile-service) reward=0.05 done=false error=null
+[STEP] step=6 action=query_metrics(profile-service) reward=0.03 done=false error=null
+[STEP] step=7 action=check_runbook(cassandra-db) reward=0.02 done=false error=null
+[STEP] step=8 action=query_metrics(cassandra-db) reward=-0.01 done=false error=null
+[STEP] step=9 action=diagnose(cassandra-db,connection_leak,increase_pool,error_rate_pct: 62.0, latency_p99_ms: 6190.1, log ) reward=0.97 done=true error=null
+[END] success=true steps=9 rewards=0.02,0.05,0.03,0.05,0.05,0.03,0.02,-0.01,0.97
+[START] task=hard env=incident_triage model=groq/llama-3-3-70b-versatile
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
 [STEP] step=2 action=query_logs(grpc-gateway) reward=0.00 done=false error=null
 [STEP] step=3 action=query_metrics(grpc-gateway) reward=0.00 done=false error=null
-[STEP] step=4 action=query_logs(search-service) reward=0.05 done=false error=null
-[STEP] step=5 action=query_logs(dns-resolver) reward=0.05 done=false error=null
-[STEP] step=6 action=diagnose(dns-resolver,config_error,fix_config,2025-04-01T10:12:00Z [ERROR] dns-resolver: Fault d) reward=0.81 done=true error=null
-[END] success=true steps=6 rewards=0.02,0.00,0.00,0.05,0.05,0.81
-[START] task=hard env=incident_triage model=groq/llama-3-3-70b-versatile
-[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_logs(catalog-service) reward=0.05 done=false error=null
-[STEP] step=3 action=query_metrics(catalog-service) reward=0.03 done=false error=null
-[STEP] step=4 action=query_logs(order-service) reward=0.05 done=false error=null
-[STEP] step=5 action=query_metrics(order-service) reward=0.03 done=false error=null
-[STEP] step=6 action=query_logs(kafka-broker) reward=0.05 done=false error=null
-[STEP] step=7 action=diagnose(catalog-service,memory_leak,restart,2025-04-01T10:14:00Z [WARN] gc.GarbageCollector: G) reward=0.92 done=true error=null
-[END] success=true steps=7 rewards=0.02,0.05,0.03,0.05,0.03,0.05,0.92
+[STEP] step=4 action=query_logs(auth-service) reward=0.05 done=false error=null
+[STEP] step=5 action=query_logs(rabbitmq) reward=0.05 done=false error=null
+[STEP] step=6 action=diagnose(rabbitmq,dns_failure,flush_dns,2025-04-01T10:14:00Z [ERROR] rabbitmq: Fault detec) reward=0.86 done=true error=null
+[END] success=true steps=6 rewards=0.02,0.00,0.00,0.05,0.05,0.86

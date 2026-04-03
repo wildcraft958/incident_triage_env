@@ -1,26 +1,20 @@
 [START] task=easy env=incident_triage model=gcp-vertex-default/gemini-2-5-flash
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(auth-service) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(auth-service) reward=0.05 done=false error=null
-[STEP] step=4 action=diagnose(auth-service,memory_leak,restart,Log line 'gc.GarbageCollector: GC pause (G1 Evacua) reward=0.78 done=true error=null
-[END] success=true steps=4 rewards=0.02,0.03,0.05,0.78
+[STEP] step=2 action=query_logs(network-controller) reward=0.05 done=false error=null
+[STEP] step=3 action=diagnose(network-controller,certificate_expired,renew_certificate,2025-04-01T10:13:00Z [ERROR] network-controller: F) reward=0.89 done=true error=null
+[END] success=true steps=3 rewards=0.02,0.05,0.89
 [START] task=medium env=incident_triage model=gcp-vertex-default/gemini-2-5-flash
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(load-balancer) reward=0.00 done=false error=null
-[STEP] step=3 action=query_metrics(search-service) reward=0.03 done=false error=null
-[STEP] step=4 action=query_metrics(profile-service) reward=0.03 done=false error=null
-[STEP] step=5 action=query_metrics(monitoring-pipeline) reward=0.00 done=false error=null
-[STEP] step=6 action=query_metrics(session-service) reward=0.00 done=false error=null
-[STEP] step=7 action=query_metrics(kafka-consumer) reward=0.03 done=false error=null
-[STEP] step=8 action=query_logs(load-balancer) reward=0.00 done=false error=null
-[STEP] step=9 action=query_logs(search-service) reward=0.05 done=false error=null
-[STEP] step=10 action=query_logs(profile-service) reward=0.05 done=false error=null
-[STEP] step=11 action=query_logs(kafka-consumer) reward=0.05 done=false error=null
-[STEP] step=12 action=diagnose(kafka-consumer,config_error,fix_config,kafka-consumer logs show 'Fault detected -- config) reward=0.83 done=true error=null
-[END] success=true steps=12 rewards=0.02,0.00,0.03,0.03,0.00,0.00,0.03,0.00,0.05,0.05,0.05,0.83
+[STEP] step=2 action=query_metrics(order-service) reward=0.03 done=false error=null
+[STEP] step=3 action=query_metrics(profile-service) reward=0.03 done=false error=null
+[STEP] step=4 action=query_metrics(edge-proxy) reward=0.00 done=false error=null
+[STEP] step=5 action=query_metrics(postgres-db) reward=0.03 done=false error=null
+[STEP] step=6 action=query_logs(postgres-db) reward=0.05 done=false error=null
+[STEP] step=7 action=diagnose(postgres-db,connection_leak,increase_pool,postgres-db metrics show latency_p99_ms: 1548.2ms ) reward=0.93 done=true error=null
+[END] success=true steps=7 rewards=0.02,0.03,0.03,0.00,0.03,0.05,0.93
 [START] task=hard env=incident_triage model=gcp-vertex-default/gemini-2-5-flash
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(payment-service) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(payment-service) reward=0.05 done=false error=null
-[STEP] step=4 action=diagnose(payment-service,thread_deadlock,restart,2025-04-01T10:13:00Z [ERROR] payment-service: Faul) reward=0.78 done=true error=null
-[END] success=true steps=4 rewards=0.02,0.03,0.05,0.78
+[STEP] step=2 action=query_metrics(service-mesh) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(service-mesh) reward=0.05 done=false error=null
+[STEP] step=4 action=diagnose(service-mesh,dns_failure,flush_dns,Logs for service-mesh show 'Fault detected -- dns_) reward=0.85 done=true error=null
+[END] success=true steps=4 rewards=0.02,0.03,0.05,0.85

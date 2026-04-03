@@ -1,36 +1,32 @@
 [START] task=easy env=incident_triage model=anthropic/claude-haiku-4-5-20251001
-[STEP] step=1 action=check_alerts() reward=0.03 done=false error=null
-[STEP] step=2 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=3 action=query_logs(api-gateway) reward=0.00 done=false error=null
-[STEP] step=4 action=query_logs(payment-service) reward=0.00 done=false error=null
-[STEP] step=5 action=query_logs(config-service) reward=0.05 done=false error=null
-[STEP] step=6 action=query_metrics(config-service) reward=0.03 done=false error=null
-[STEP] step=7 action=query_metrics(payment-service) reward=0.00 done=false error=null
-[STEP] step=8 action=query_metrics(api-gateway) reward=0.00 done=false error=null
-[STEP] step=9 action=trace_request(config-service) reward=0.04 done=false error=null
-[STEP] step=10 action=diagnose(config-service,certificate_expired,renew_certificate,config-service logs show [ERROR] config-service: F) reward=0.96 done=true error=null
-[END] success=true steps=10 rewards=0.03,0.02,0.00,0.00,0.05,0.03,0.00,0.00,0.04,0.96
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_metrics(inventory-service) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(inventory-service) reward=0.05 done=false error=null
+[STEP] step=4 action=check_runbook(inventory-service) reward=0.02 done=false error=null
+[STEP] step=5 action=query_logs(postgres-db) reward=0.00 done=false error=null
+[STEP] step=6 action=query_metrics(postgres-db) reward=0.00 done=false error=null
+[STEP] step=7 action=trace_request(inventory-service) reward=0.04 done=false error=null
+[STEP] step=8 action=diagnose(inventory-service,memory_leak,restart,GC pause of 3259ms with heap at 3.5GB/4.0GB (87.5%) reward=0.77 done=true error=null
+[END] success=true steps=8 rewards=0.02,0.03,0.05,0.02,0.00,0.00,0.04,0.77
 [START] task=medium env=incident_triage model=anthropic/claude-haiku-4-5-20251001
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
 [STEP] step=2 action=query_metrics(kafka-broker) reward=0.03 done=false error=null
 [STEP] step=3 action=query_logs(kafka-broker) reward=0.05 done=false error=null
-[STEP] step=4 action=query_metrics(search-service) reward=0.03 done=false error=null
-[STEP] step=5 action=query_metrics(profile-service) reward=0.03 done=false error=null
-[STEP] step=6 action=query_logs(profile-service) reward=0.05 done=false error=null
-[STEP] step=7 action=query_logs(search-service) reward=0.05 done=false error=null
-[STEP] step=8 action=query_logs(grpc-gateway) reward=0.00 done=false error=null
-[STEP] step=9 action=check_alerts() reward=0.03 done=false error=null
-[STEP] step=10 action=diagnose(kafka-broker,cpu_saturated,scale_up,kafka-broker logs show 'Fault detected -- cpu_satu) reward=0.97 done=true error=null
-[END] success=true steps=10 rewards=0.02,0.03,0.05,0.03,0.03,0.05,0.05,0.00,0.03,0.97
+[STEP] step=4 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=5 action=check_runbook(kafka-broker) reward=0.02 done=false error=null
+[STEP] step=6 action=query_logs(inventory-service) reward=0.05 done=false error=null
+[STEP] step=7 action=query_logs(profile-service) reward=0.05 done=false error=null
+[STEP] step=8 action=query_metrics(inventory-service) reward=0.03 done=false error=null
+[STEP] step=9 action=diagnose(kafka-broker,cpu_saturated,scale_up,Alert [P1] Cpu-SaturatedDetected fired at 2025-04-) reward=0.96 done=true error=null
+[END] success=true steps=9 rewards=0.02,0.03,0.05,0.03,0.02,0.05,0.05,0.03,0.96
 [START] task=hard env=incident_triage model=anthropic/claude-haiku-4-5-20251001
-[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(inventory-service) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(inventory-service) reward=0.05 done=false error=null
-[STEP] step=4 action=query_metrics(order-service) reward=0.03 done=false error=null
-[STEP] step=5 action=query_logs(order-service) reward=0.05 done=false error=null
-[STEP] step=6 action=query_logs(dns-resolver) reward=0.05 done=false error=null
-[STEP] step=7 action=query_metrics(dns-resolver) reward=0.03 done=false error=null
-[STEP] step=8 action=trace_request(inventory-service) reward=0.04 done=false error=null
-[STEP] step=9 action=query_logs(inventory-service) reward=-0.01 done=false error=null
-[STEP] step=10 action=diagnose(inventory-service,memory_leak,restart,Heap memory at 97% (3.9GB/4.0GB) with repeated Out) reward=0.93 done=true error=null
-[END] success=true steps=10 rewards=0.02,0.03,0.05,0.03,0.05,0.05,0.03,0.04,-0.01,0.93
+[STEP] step=1 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=2 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=3 action=query_logs(config-service) reward=0.05 done=false error=null
+[STEP] step=4 action=query_metrics(config-service) reward=0.03 done=false error=null
+[STEP] step=5 action=query_logs(rabbitmq) reward=0.05 done=false error=null
+[STEP] step=6 action=query_metrics(rabbitmq) reward=0.03 done=false error=null
+[STEP] step=7 action=query_logs(search-service) reward=0.05 done=false error=null
+[STEP] step=8 action=check_runbook(config-service) reward=0.02 done=false error=null
+[STEP] step=9 action=diagnose(config-service,dns_failure,flush_dns,config-service logs show explicit dns_failure erro) reward=0.91 done=true error=null
+[END] success=true steps=9 rewards=0.03,0.02,0.05,0.03,0.05,0.03,0.05,0.02,0.91

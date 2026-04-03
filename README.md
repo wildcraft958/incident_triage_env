@@ -342,34 +342,36 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 
 ## Model Capability Benchmarks
 
-Ablation study across 5 models ranging from 17B to frontier-class, tested against the procedural generation engine. Each model ran all three task difficulties (easy/medium/hard). Full run logs are in `outputs/ablation/`.
+Ablation study across 5 models ranging from 17B to frontier-class, tested against the procedural generation engine with evidence grounding and anti-reward-hacking protections enabled. Each model ran all three task difficulties (easy/medium/hard). Full run logs are in `outputs/ablation/`.
 
 ### Score Comparison
 
 | Model | Parameters | Easy | Medium | Hard | Avg | Steps (avg) |
 |---|---|---|---|---|---|---|
-| Llama 4 Scout | 17B MoE | 0.95 | 0.82 | 0.70 | 0.82 | 6 |
-| Qwen3 | 32B | 0.96 | 0.77 | 0.80 | 0.84 | 4 |
-| Llama 3.3 | 70B | 0.76 | 0.81 | 0.92 | 0.83 | 7 |
-| Gemini 2.5 Flash | Frontier | 0.78 | 0.83 | 0.78 | 0.80 | 7 |
-| Claude Haiku 4.5 | Frontier | **0.96** | **0.97** | **0.93** | **0.95** | 10 |
+| Llama 4 Scout | 17B MoE | 0.77 | 0.88 | 0.74 | 0.80 | 6 |
+| Qwen3 | 32B | 0.96 | 0.86 | 0.32 | 0.71 | 4 |
+| Llama 3.3 | 70B | 0.78 | **0.97** | 0.86 | 0.87 | 7 |
+| Gemini 2.5 Flash | Frontier | 0.89 | 0.93 | 0.85 | **0.89** | 5 |
+| Claude Haiku 4.5 | Frontier | 0.77 | 0.96 | **0.91** | 0.88 | 9 |
 
 ### Key Findings
 
-**The environment differentiates model capability on hard tasks.** Hard task scores range from 0.70 (Llama 4 Scout 17B) to 0.93 (Claude Haiku 4.5), a 0.23 spread that proves the environment is not trivially solvable.
+**The hardened grader produces wider score spreads.** Hard task scores range from 0.32 (Qwen3 32B) to 0.91 (Claude Haiku 4.5), a 0.59 spread. Evidence grounding verification and input validation prevent agents from gaming scores through hallucinated citations or keyword stuffing.
 
-**Investigation depth correlates with score.** Claude Haiku 4.5 consistently used 10 steps, cross-referencing logs and metrics for the same services and citing specific evidence. Smaller models diagnosed in 3-5 steps, often skipping the cross-referencing that earns investigation quality points.
+**Investigation depth correlates with score on hard tasks.** Claude Haiku 4.5 consistently used 9 steps, cross-referencing logs and metrics and citing grounded evidence. Qwen3 diagnosed in 4 steps on hard, misidentified the fault type, and scored 0.32. The blind diagnosis penalty and evidence grounding combine to punish shallow investigation.
+
+**Frontier models use runbooks.** Both Claude Haiku and Gemini discovered and used the `check_runbook` action without being explicitly told to. Smaller models ignored it entirely. This emergent behavior demonstrates the environment rewards methodical investigation.
 
 **Observed behavioral differences across tiers:**
-- **Small models (17B)**: Diagnose quickly with minimal investigation. Get the root cause right but miss fault type nuances. Weak evidence citations ("dns_failure error log" vs specific timestamps).
-- **Medium models (32-70B)**: Better causal chain navigation. Cross-reference logs and metrics. Sometimes misidentify fault type on medium/hard scenarios.
-- **Frontier models**: Exhaustive investigation. Check topology, query every causal chain service's logs AND metrics, use trace_request, and cite exact log lines and metric values in evidence. Earn both investigation quality bonuses and evidence bonuses.
+- **Small models (17B-32B)**: Diagnose in 3-5 steps. Identify the right service but miss fault type nuances. Qwen3 scored 0.96 on easy but collapsed to 0.32 on hard, showing the environment genuinely scales with reasoning depth.
+- **Large models (70B)**: Follow the dependency chain methodically. Cross-reference logs and metrics. Llama 3.3 scored 0.97 on medium by investigating 5 different services before diagnosing.
+- **Frontier models**: Exhaustive investigation. Check topology, query causal chain services' logs AND metrics, use trace_request and check_runbook, and cite exact log lines and metric values. Earn investigation quality bonuses and grounded evidence bonuses.
 
-**The grader produces meaningful score variance:**
-- Wrong diagnosis: 0.01
-- Blind diagnosis (no investigation): ~0.50
-- Investigated + correct diagnosis: 0.76-0.97
-- Perfect investigation + evidence: 0.93-0.97
+**Anti-reward-hacking in action:**
+- Evidence grounding blocks hallucinated citations (agent must have queried the service it cites)
+- Keyword stuffing detection halves evidence bonus when agents shotgun keywords from 3+ fault types
+- Input validation rejects invalid fault types and remediations, letting agents retry instead of silently scoring 0
+- The grader produces meaningful variance: wrong diagnosis = 0.01, blind guess = ~0.30, investigated + correct = 0.77-0.97
 
 ## Running Inference
 
@@ -383,13 +385,15 @@ python inference.py
 Output follows the mandatory `[START]`/`[STEP]`/`[END]` format:
 
 ```
-[START] task=easy env=incident_triage model=anthropic/claude-haiku-4-5-20251001
-[STEP] step=1 action=check_alerts() reward=0.03 done=false error=null
-[STEP] step=2 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=3 action=query_logs(api-gateway) reward=0.00 done=false error=null
+[START] task=medium env=incident_triage model=anthropic/claude-haiku-4-5-20251001
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_metrics(kafka-broker) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(kafka-broker) reward=0.05 done=false error=null
+[STEP] step=4 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=5 action=check_runbook(kafka-broker) reward=0.02 done=false error=null
 ...
-[STEP] step=10 action=diagnose(config-service,certificate_expired,renew_certificate,config-service logs show [ERROR]...) reward=0.96 done=true error=null
-[END] success=true steps=10 rewards=0.03,0.02,0.00,0.00,0.05,0.03,0.00,0.00,0.04,0.96
+[STEP] step=9 action=diagnose(kafka-broker,cpu_saturated,scale_up,Alert [P1] Cpu-SaturatedDetected...) reward=0.96 done=true error=null
+[END] success=true steps=9 rewards=0.02,0.03,0.05,0.03,0.02,0.05,0.05,0.03,0.96
 ```
 
 ## API
