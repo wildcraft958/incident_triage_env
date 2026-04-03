@@ -373,6 +373,24 @@ Ablation study across 5 models ranging from 17B to frontier-class, tested agains
 - Input validation rejects invalid fault types and remediations, letting agents retry instead of silently scoring 0
 - The grader produces meaningful variance: wrong diagnosis = 0.01, blind guess = ~0.30, investigated + correct = 0.77-0.97
 
+### Score Anomaly Analysis
+
+Medium scores consistently beat easy scores across all 5 models. We investigated this across 20 seeded scenarios per difficulty and found a structural explanation:
+
+**Root cause:** Each difficulty uses different fault patterns with different log categories. Medium fault patterns (`connection_leak`, `cpu_saturated`) produce logs with explicit fault signatures (`"Connection pool exhausted"`, `"Fault detected -- cpu_saturated"`). Easy patterns (`oom`, `memory_leak`) use `java_oom` log templates with ambiguous GC/heap messages where models confuse `oom` vs `memory_leak`.
+
+**What each difficulty actually tests:**
+
+| Difficulty | Challenge Type | Log Signal Clarity | Chain Depth |
+|---|---|---|---|
+| Easy | Ambiguity resolution | Low -- GC pauses could be OOM or memory leak | 1-2 hops |
+| Medium | Causal chain navigation | High -- explicit fault names in logs | 2-4 hops |
+| Hard | Deep reasoning under blindness | Medium -- but stale metrics and 5-deep chains | 3-5 hops |
+
+**Max achievable scores with perfect play** (20 seeds averaged): easy=0.965, medium=0.976, hard=0.986. The ceiling is comparable. Differentiation comes from agent mistakes, not grader limits.
+
+**The competition-relevant metric is the hard task spread:** 0.32 (Qwen3 32B) to 0.91 (Claude Haiku 4.5), a 0.59 gap. This proves the environment is not trivially solvable and genuinely differentiates reasoning capability.
+
 ## Running Inference
 
 ```bash
