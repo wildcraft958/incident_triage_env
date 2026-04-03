@@ -1,0 +1,22 @@
+[START] task=easy env=incident_triage model=openai-main/gpt-4o-mini
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_metrics(catalog-service) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(catalog-service) reward=0.05 done=false error=null
+[STEP] step=4 action=query_metrics(mysql-db) reward=0.00 done=false error=null
+[STEP] step=5 action=check_runbook(catalog-service) reward=0.02 done=false error=null
+[STEP] step=6 action=diagnose(catalog-service,oom,restart,GC pause (G1 Evacuation Pause) 5892ms -- heap 3.8G) reward=0.96 done=true error=null
+[END] success=true steps=6 rewards=0.02,0.03,0.05,0.00,0.02,0.96
+[START] task=medium env=incident_triage model=openai-main/gpt-4o-mini
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_metrics(dns-resolver) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(dns-resolver) reward=0.05 done=false error=null
+[STEP] step=4 action=diagnose(dns-resolver,cpu_saturated,scale_up,2025-04-01T10:15:00Z [ERROR] dns-resolver: Fault d) reward=0.87 done=true error=null
+[END] success=true steps=4 rewards=0.02,0.03,0.05,0.87
+[START] task=hard env=incident_triage model=openai-main/gpt-4o-mini
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_logs(load-balancer) reward=0.00 done=false error=null
+[STEP] step=3 action=query_logs(session-service) reward=0.05 done=false error=null
+[STEP] step=4 action=query_logs(auth-service) reward=0.05 done=false error=null
+[STEP] step=5 action=query_logs(cert-manager) reward=0.05 done=false error=null
+[STEP] step=6 action=diagnose(cert-manager,dns_failure,flush_dns,2025-04-01T10:14:00Z [ERROR] cert-manager: Fault d) reward=0.89 done=true error=null
+[END] success=true steps=6 rewards=0.02,0.00,0.05,0.05,0.05,0.89

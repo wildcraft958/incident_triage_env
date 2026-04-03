@@ -232,7 +232,6 @@ flowchart LR
 | `incident_triage_env/grader.py` | Diagnosis + evidence + criticality + investigation scoring | Deterministic, range [0.0, 1.0], partial credit |
 | `incident_triage_env/scenarios.py` | Scenario accessor (delegates to generator) | Backward compat pool lists |
 | `incident_triage_env/log_templates.py` | Realistic log generators from LogHub | Timestamps, thread IDs, stack traces |
-| `incident_triage_env/real_incidents.py` | Maps real outages to fault patterns | Reference data for pattern design |
 | `server/app.py` | FastAPI server via create_app() | HTTP + WebSocket + MCP |
 | `server/incident_triage_environment.py` | OpenEnv Environment adapter | Bridges env.py to openenv interface |
 | `inference.py` | Baseline LLM agent | Temporal-aware prompting, evidence citation |

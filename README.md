@@ -335,32 +335,30 @@ Ablation study across 5 models ranging from 17B to frontier-class, tested agains
 
 ### Score Comparison
 
+Tested across 8 models from 17B to frontier-class, spanning 4 providers (Groq, OpenAI, Anthropic, Google). Each model ran all three task difficulties with procedurally generated scenarios.
+
 | Model | Parameters | Easy | Medium | Hard | Avg | Steps (avg) |
 |---|---|---|---|---|---|---|
-| Llama 4 Scout | 17B MoE | 0.77 | 0.88 | 0.74 | 0.80 | 6 |
-| Qwen3 | 32B | 0.96 | 0.86 | 0.32 | 0.71 | 4 |
+| Llama 4 Scout | 17B MoE | 0.95 | 0.85 | 0.85 | 0.88 | 6 |
+| Qwen3 | 32B | 0.83 | 0.59 | 0.86 | 0.76 | 5 |
 | Llama 3.3 | 70B | 0.78 | **0.97** | 0.86 | 0.87 | 7 |
-| Gemini 2.5 Flash | Frontier | 0.89 | 0.93 | 0.85 | **0.89** | 5 |
+| GPT-4o-mini | Frontier | **0.96** | 0.87 | 0.89 | **0.91** | 5 |
+| Gemini 2.5 Flash | Frontier | 0.89 | 0.93 | 0.85 | 0.89 | 5 |
+| Claude 3 Haiku | Frontier | 0.86 | 0.82 | 0.53 | 0.74 | 7 |
 | Claude Haiku 4.5 | Frontier | 0.77 | 0.96 | **0.91** | 0.88 | 9 |
 
 ### Key Findings
 
-**The hardened grader produces wider score spreads.** Hard task scores range from 0.32 (Qwen3 32B) to 0.91 (Claude Haiku 4.5), a 0.59 spread. Evidence grounding verification and input validation prevent agents from gaming scores through hallucinated citations or keyword stuffing.
+**Score range: 0.53 to 0.97 across 8 models.** The environment produces meaningful variance. Wrong diagnosis scores 0.01, blind guess scores around 0.30, and investigated + correct scores 0.77-0.97. Procedural generation means each run gets a different scenario, so scores vary between runs for the same model.
 
-**Investigation depth correlates with score on hard tasks.** Claude Haiku 4.5 consistently used 9 steps, cross-referencing logs and metrics and citing grounded evidence. Qwen3 diagnosed in 4 steps on hard, misidentified the fault type, and scored 0.32. The blind diagnosis penalty and evidence grounding combine to punish shallow investigation.
+**Investigation depth correlates with hard task score.** Claude Haiku 4.5 used 9 steps on hard, cross-referencing logs and metrics, and scored 0.91. Claude 3 Haiku diagnosed in 7 steps on hard but misidentified the fault type, scoring 0.53. Qwen3 diagnosed in 5 steps, got the wrong remediation on medium, and scored 0.59.
 
-**Frontier models use runbooks.** Both Claude Haiku and Gemini discovered and used the `check_runbook` action without being explicitly told to. Smaller models ignored it entirely. This emergent behavior demonstrates the environment rewards methodical investigation.
-
-**Observed behavioral differences across tiers:**
-- **Small models (17B-32B)**: Diagnose in 3-5 steps. Identify the right service but miss fault type nuances. Qwen3 scored 0.96 on easy but collapsed to 0.32 on hard, showing the environment genuinely scales with reasoning depth.
-- **Large models (70B)**: Follow the dependency chain methodically. Cross-reference logs and metrics. Llama 3.3 scored 0.97 on medium by investigating 5 different services before diagnosing.
-- **Frontier models**: Exhaustive investigation. Check topology, query causal chain services' logs AND metrics, use trace_request and check_runbook, and cite exact log lines and metric values. Earn investigation quality bonuses and grounded evidence bonuses.
+**Frontier models discover runbooks.** GPT-4o-mini, Claude Haiku, and Gemini all discovered and used `check_runbook` without being explicitly told to. This emergent behavior demonstrates the environment rewards methodical SRE investigation.
 
 **Anti-reward-hacking in action:**
 - Evidence grounding blocks hallucinated citations (agent must have queried the service it cites)
 - Keyword stuffing detection halves evidence bonus when agents shotgun keywords from 3+ fault types
 - Input validation rejects invalid fault types and remediations, letting agents retry instead of silently scoring 0
-- The grader produces meaningful variance: wrong diagnosis = 0.01, blind guess = ~0.30, investigated + correct = 0.77-0.97
 
 For the full evolution of how this environment and its scores developed across 30+ commits -- including the shortcut learning anomaly, reward hacking research, and phase-by-phase scoring analysis -- see [docs/SCORING_ANALYSIS.md](docs/SCORING_ANALYSIS.md).
 
@@ -426,7 +424,6 @@ incident-triage-env/
 │   ├── temporal.py              # TemporalSimulator (sigmoid degradation, causal delays)
 │   ├── grader.py                # Deterministic scoring with evidence + criticality bonus
 │   ├── scenarios.py             # Scenario accessor (delegates to generator)
-│   ├── real_incidents.py        # Real post-mortem mappings
 │   └── log_templates.py         # Realistic log generators (LogHub patterns)
 ├── Dockerfile                   # Multi-stage Docker build
 ├── server/

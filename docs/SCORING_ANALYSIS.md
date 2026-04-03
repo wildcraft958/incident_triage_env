@@ -158,7 +158,24 @@ The hard task spread of 0.59 (Qwen3 0.32 to Claude Haiku 0.91) proves the enviro
 | Task & Grader Quality (25%) | 3 tasks, deterministic grader, 0.59 hard spread across 5 models, anti-reward-hacking | 20-25 |
 | Environment Design (20%) | 7 actions, procedural DAGs, temporal sigmoid degradation, criticality tiering, runbooks | 16-20 |
 | Code Quality (15%) | 177 tests, openenv validate passes, Docker builds, HF Space deploys, typed models | 12-15 |
-| Creativity (10%) | Evidence grounding, shortcut learning analysis, chaos evaluator, 5-model ablation | 7-10 |
+| Creativity (10%) | Evidence grounding, shortcut learning analysis, chaos evaluator, 8-model ablation | 7-10 |
+
+## Phase 7: Final 8-Model Ablation
+
+**Commit:** `e9e0518`
+
+After the safety audit (newline sanitization, empty rewards fix, Dockerfile consolidation), I re-ran inference across 4 additional models via TrueFoundry to validate the hardened environment.
+
+| Model | Parameters | Easy | Medium | Hard | Avg |
+|---|---|---|---|---|---|
+| Llama 4 Scout | 17B MoE | 0.95 | 0.85 | 0.85 | 0.88 |
+| Qwen3 | 32B | 0.83 | 0.59 | 0.86 | 0.76 |
+| GPT-4o-mini | Frontier | 0.96 | 0.87 | 0.89 | 0.91 |
+| Claude 3 Haiku | Frontier | 0.86 | 0.82 | 0.53 | 0.74 |
+
+Combined with Phase 6 results, the environment has now been tested across 8 models from 4 providers (Groq, OpenAI, Anthropic, Google). Score range: 0.53 to 0.97. Zero parse errors, zero format violations across all runs.
+
+Qwen3 got 0.59 on medium (wrong remediation for connection_leak -- chose `restart` instead of `increase_pool`). Claude 3 Haiku got 0.53 on hard (misidentified fault type as `dependency_timeout`). Both demonstrate the grader correctly penalizes wrong answers even when the right service is identified.
 
 ## Test Coverage
 
