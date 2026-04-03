@@ -2,8 +2,11 @@
 
 from .generator import ProceduralScenarioGenerator
 from .grader import grade_diagnosis, grade_investigation_quality
-from .models import ActionType, IncidentAction, IncidentObservation
+from .models import ActionType, FaultType, IncidentAction, IncidentObservation, Remediation
 from .temporal import TemporalSimulator
+
+_VALID_FAULT_TYPES = {f.value for f in FaultType}
+_VALID_REMEDIATIONS = {r.value for r in Remediation}
 
 _VALID_ACTION_TYPES = {a.value for a in ActionType}
 
@@ -56,6 +59,7 @@ class IncidentTriageEnv:
         self.score: float = 0.0
         self.history: list[dict] = []
         self.queried_actions: set[tuple] = set()
+        self._response_history: list[str] = []
 
     def reset(self) -> IncidentObservation:
         """Generate a fresh scenario and reset all episode state.
@@ -72,6 +76,7 @@ class IncidentTriageEnv:
         self.score = 0.0
         self.history = []
         self.queried_actions = set()
+        self._response_history = []
 
         services = self.scenario["services"]
         return IncidentObservation(
@@ -142,8 +147,11 @@ class IncidentTriageEnv:
                 action.target_service, action.fault_type, action.remediation,
                 action.hypothesis_evidence,
             )
+            if not done and reward == -0.02:
+                info = {"error": f"invalid_diagnose_input: {response}"}
 
         self.step_count += 1
+        self._response_history.append(response)
         self.history.append({
             "step": self.step_count,
             "action": atype,
@@ -320,6 +328,13 @@ class IncidentTriageEnv:
         remediation: str | None,
         hypothesis_evidence: str | None = None,
     ) -> tuple[str, float, bool]:
+        if service is not None and service not in self.scenario.get("services", []):
+            return f"Error: service '{service}' not found in this incident.", -0.02, False
+        if fault_type is not None and fault_type not in _VALID_FAULT_TYPES:
+            return f"Error: invalid fault_type '{fault_type}'. Valid: {', '.join(sorted(_VALID_FAULT_TYPES))}", -0.02, False
+        if remediation is not None and remediation not in _VALID_REMEDIATIONS:
+            return f"Error: invalid remediation '{remediation}'. Valid: {', '.join(sorted(_VALID_REMEDIATIONS))}", -0.02, False
+
         diag_result = grade_diagnosis(
             service,
             fault_type,
@@ -329,6 +344,7 @@ class IncidentTriageEnv:
             hypothesis_evidence=hypothesis_evidence,
             scenario=self.scenario,
             service_criticality=self.scenario.get("service_criticality"),
+            observation_history=self._response_history,
         )
         diag_score: float = diag_result["score"]
 

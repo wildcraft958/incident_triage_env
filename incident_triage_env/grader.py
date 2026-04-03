@@ -25,6 +25,7 @@ def grade_diagnosis(
     hypothesis_evidence: str | None = None,
     scenario: dict | None = None,
     service_criticality: dict | None = None,
+    observation_history: list[str] | None = None,
 ) -> dict:
     """Grade a submitted diagnosis against the ground truth.
 
@@ -50,7 +51,7 @@ def grade_diagnosis(
         service_correct > 0, service_identified, gt_service, service_criticality
     )
 
-    evidence_bonus = _score_evidence(hypothesis_evidence, gt_service, gt_fault, scenario)
+    evidence_bonus = _score_evidence(hypothesis_evidence, gt_service, gt_fault, scenario, observation_history)
 
     score = min(1.0, max(0.0, base_score + criticality_adj + evidence_bonus))
 
@@ -113,23 +114,47 @@ def _score_evidence(
     root_service: str,
     fault_type: str,
     scenario: dict | None,
+    observation_history: list[str] | None = None,
 ) -> float:
-    """Score hypothesis evidence for up to +0.10 bonus."""
+    """Score hypothesis evidence for up to +0.10 bonus.
+
+    Evidence grounding: if observation_history is provided, the service-name
+    bonus is only awarded when the root service actually appeared in prior
+    observations (i.e. the agent queried it). This prevents hallucinated
+    evidence from earning points.
+
+    Anti-keyword-stuffing: if the evidence matches keywords from 3+ different
+    fault types, the bonus is halved. Focused citations are rewarded over
+    shotgun keyword dumps.
+    """
     if not hypothesis_evidence:
         return 0.0
 
     bonus = 0.0
     evidence_lower = hypothesis_evidence.lower()
 
+    # Evidence grounding check
+    history_text = " ".join(observation_history).lower() if observation_history else None
+
     # +0.05 if evidence references the root cause service
+    # but only if the agent actually observed data about that service
     if root_service.lower() in evidence_lower:
-        bonus += 0.05
+        if history_text is None or root_service.lower() in history_text:
+            bonus += 0.05
 
     # +0.02 per matching signal keyword (max +0.05)
     keywords = EVIDENCE_KEYWORDS.get(fault_type, [])
     matches = sum(1 for kw in keywords if kw.lower() in evidence_lower)
     if matches > 0:
         bonus += min(0.05, matches * 0.02)
+
+    # Anti-keyword-stuffing: penalize if evidence matches keywords from 3+ fault types
+    fault_types_matched = 0
+    for ft, kws in EVIDENCE_KEYWORDS.items():
+        if any(kw.lower() in evidence_lower for kw in kws):
+            fault_types_matched += 1
+    if fault_types_matched >= 3:
+        bonus = bonus * 0.5
 
     return round(bonus, 2)
 

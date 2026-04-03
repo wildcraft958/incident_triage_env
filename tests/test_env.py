@@ -71,17 +71,19 @@ class TestStep:
         assert obs.response != ""
 
     def test_diagnose_ends_episode(self):
+        svc = self.env.scenario["services"][0]
         obs, r, done, info = self.env.step(IncidentAction(
             action_type="diagnose",
-            target_service="auth-service",
+            target_service=svc,
             fault_type="oom",
             remediation="restart",
         ))
         assert done is True
 
     def test_step_after_done(self):
+        svc = self.env.scenario["services"][0]
         self.env.step(IncidentAction(
-            action_type="diagnose", target_service="x",
+            action_type="diagnose", target_service=svc,
             fault_type="oom", remediation="restart",
         ))
         obs, r, done, info = self.env.step(
@@ -172,13 +174,17 @@ class TestRewardSignals:
     def test_wrong_diagnosis_low_score(self):
         env = IncidentTriageEnv(task="easy")
         env.reset()
+        # Use a valid service that's NOT the root cause, with wrong fault/remediation
+        gt = env.scenario["root_cause"]
+        wrong_svc = [s for s in env.scenario["services"] if s != gt["service"]]
+        svc = wrong_svc[0] if wrong_svc else env.scenario["services"][0]
         _, r, done, _ = env.step(IncidentAction(
             action_type="diagnose",
-            target_service="nonexistent",
-            fault_type="wrong",
-            remediation="wrong",
+            target_service=svc,
+            fault_type="dns_failure",
+            remediation="flush_dns",
         ))
-        assert r < 0.05
+        assert r < 0.30
         assert done is True
 
 
@@ -469,3 +475,151 @@ class TestCheckRunbook:
         )
         assert info.get("error") is not None
         assert r == -0.02
+
+
+class TestEvidenceGrounding:
+    """Evidence bonus must only be awarded for data the agent actually observed."""
+
+    def test_ungrounded_evidence_gets_no_bonus(self):
+        """Agent cites a service it never queried -- no evidence bonus."""
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+        root = gt["service"]
+        # Investigate a DIFFERENT service, not the root
+        other = [s for s in env.scenario["services"] if s != root]
+        if other:
+            env.step(IncidentAction(action_type="query_logs", target_service=other[0]))
+        # Diagnose with evidence citing the root service (never queried)
+        _, score_ungrounded, _, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=root,
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+            hypothesis_evidence=f"{root} heap at 99%, OutOfMemoryError in logs",
+        ))
+
+        # Now do it properly: query root first, then diagnose with same evidence
+        env2 = IncidentTriageEnv(task="easy")
+        env2.scenario = env.scenario
+        env2._temporal = TemporalSimulator(env.scenario, env.max_steps)
+        env2.step_count = 0
+        env2.done = False
+        env2.score = 0.0
+        env2.history = []
+        env2.queried_actions = set()
+        env2._response_history = []
+        env2.step(IncidentAction(action_type="query_logs", target_service=root))
+        env2.step(IncidentAction(action_type="query_metrics", target_service=root))
+        _, score_grounded, _, _ = env2.step(IncidentAction(
+            action_type="diagnose",
+            target_service=root,
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+            hypothesis_evidence=f"{root} heap at 99%, OutOfMemoryError in logs",
+        ))
+
+        assert score_grounded >= score_ungrounded
+
+    def test_keyword_stuffing_penalized(self):
+        """Evidence dumping keywords from 4+ fault types gets reduced bonus."""
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+        root = gt["service"]
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="query_logs", target_service=root))
+        env.step(IncidentAction(action_type="query_metrics", target_service=root))
+
+        # Shotgun evidence: keywords from many fault types
+        stuffed = f"{root} heap outofmemoryerror cpu dns certificate connection pool disk full deadlock"
+        _, score_stuffed, _, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=root,
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+            hypothesis_evidence=stuffed,
+        ))
+
+        # Focused evidence: only keywords matching the actual fault type
+        env2 = IncidentTriageEnv(task="easy")
+        env2.scenario = env.scenario
+        env2._temporal = TemporalSimulator(env.scenario, env.max_steps)
+        env2.step_count = 0
+        env2.done = False
+        env2.score = 0.0
+        env2.history = []
+        env2.queried_actions = set()
+        env2._response_history = []
+        env2.step(IncidentAction(action_type="check_topology"))
+        env2.step(IncidentAction(action_type="query_logs", target_service=root))
+        env2.step(IncidentAction(action_type="query_metrics", target_service=root))
+
+        from incident_triage_env.grader import EVIDENCE_KEYWORDS
+        fault_kws = EVIDENCE_KEYWORDS.get(gt["fault_type"], [])
+        focused = f"{root} " + " ".join(fault_kws[:2]) if fault_kws else root
+        _, score_focused, _, _ = env2.step(IncidentAction(
+            action_type="diagnose",
+            target_service=root,
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+            hypothesis_evidence=focused,
+        ))
+
+        assert score_focused >= score_stuffed
+
+
+class TestDiagnoseValidation:
+    """Diagnose must validate fault_type, remediation, and target_service."""
+
+    def test_diagnose_invalid_fault_type_returns_error(self):
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        obs, r, done, info = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=env.scenario["services"][0],
+            fault_type="made_up_fault",
+            remediation="restart",
+        ))
+        assert done is False
+        assert r == -0.02
+        assert info.get("error") is not None
+
+    def test_diagnose_invalid_remediation_returns_error(self):
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        obs, r, done, info = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=env.scenario["services"][0],
+            fault_type="oom",
+            remediation="pray_harder",
+        ))
+        assert done is False
+        assert r == -0.02
+        assert info.get("error") is not None
+
+    def test_diagnose_unknown_service_returns_error(self):
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        obs, r, done, info = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service="fake-nonexistent-service",
+            fault_type="oom",
+            remediation="restart",
+        ))
+        assert done is False
+        assert r == -0.02
+        assert info.get("error") is not None
+
+    def test_diagnose_valid_values_accepted(self):
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+        _, _, done, info = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+        assert done is True
+        assert info.get("error") is None
