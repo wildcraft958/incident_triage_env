@@ -115,10 +115,10 @@ update_routes, resize_volume
 
 Before submission, ALL must pass:
 - [ ] `python -m pytest tests/ -v` -- all green
-- [ ] `docker build -t incident-triage-env .` -- succeeds
-- [ ] `docker run -p 7860:7860 incident-triage-env` -- serves on 7860
-- [ ] `curl localhost:7860/` -- returns 200
-- [ ] `curl -X POST localhost:7860/reset -d '{"task":"easy"}'` -- returns observation
+- [ ] `docker build -f server/Dockerfile -t incident-triage-env .` -- succeeds
+- [ ] `docker run -p 8000:8000 incident-triage-env` -- serves on 8000
+- [ ] `curl localhost:8000/` -- returns 200
+- [ ] `curl -X POST localhost:8000/reset -d '{"task":"easy"}'` -- returns observation
 - [ ] `python inference.py` -- completes, produces [START]/[STEP]/[END] output
 - [ ] `bash scripts/validate.sh https://your-space.hf.space` -- all checks pass
 - [ ] Memory usage < 8GB during inference run
@@ -133,6 +133,7 @@ Before submission, ALL must pass:
 | Check topology | +0.02 | First time only |
 | Trace request through causal chain | +0.04 | First time only |
 | Check alerts (reveals relevant alert) | +0.03 | First time only |
+| Check runbook of causal chain service | +0.02 | First time only |
 | Query irrelevant service (logs or metrics) | +0.00 | No penalty, no reward |
 | Repeated query to same service (same action) | -0.01 | Discourage loops |
 | Invalid/malformed action | -0.02 | Error handling |
@@ -146,7 +147,7 @@ Before submission, ALL must pass:
 ## DOCKER RULES
 
 - Base image: python:3.11-slim
-- Expose port 7860 (HuggingFace Spaces standard)
+- Expose port 8000 (configured in openenv.yaml)
 - No GPU required
 - No external service dependencies (no real databases, no Redis, etc.)
 - Everything runs in-memory with synthetic data

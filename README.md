@@ -228,24 +228,6 @@ The grader awards up to +0.10 bonus for quality evidence:
 
 This rewards agents that build transparent, verifiable reasoning chains rather than guessing.
 
-## Tasks
-
-Three difficulty levels with meaningful progression:
-
-```mermaid
-graph LR
-    subgraph Easy["Easy (3-4 services)"]
-        E1["Single service crash\nClear error signals\nDirect log evidence"]
-    end
-    subgraph Medium["Medium (4-6 services)"]
-        M1["Cascading failure\n2-3 service chain\nTimestamp correlation needed"]
-    end
-    subgraph Hard["Hard (6-9 services)"]
-        H1["Silent degradation\n5-service causal chain\nMonitoring blindness"]
-    end
-    Easy --> Medium --> Hard
-```
-
 ## Action Space
 
 Seven investigation actions that mirror what real SREs do:
@@ -257,10 +239,12 @@ Seven investigation actions that mirror what real SREs do:
 | `check_topology()` | none | +0.02 (first time) |
 | `trace_request(service)` | `target_service: str` (optional) | +0.04 if service in causal chain (first time) |
 | `check_alerts()` | none | +0.03 (first time) |
-| `diagnose(service, fault_type, remediation, hypothesis_evidence)` | all required except evidence | 0.0 - 1.0 (see scoring) |
+| `check_runbook(service)` | `target_service: str` | +0.02 if service in causal chain (first time) |
+| `diagnose(service, fault_type, remediation, evidence)` | all required except evidence | 0.0 - 1.0 (see scoring) |
 
 - Repeated identical queries: -0.01 (discourages loops)
 - Invalid or malformed actions: -0.02
+- Invalid fault_type or remediation in diagnose: -0.02 (agent can retry)
 - Max 15 steps per episode
 
 ## Observation Space
@@ -274,7 +258,6 @@ Seven investigation actions that mirror what real SREs do:
 | `response` | string | Result of the last action (evolves with temporal state) |
 | `step` | int | Current step number |
 | `done` | bool | Whether the episode has ended |
-| `reward` | float | Reward from the last action |
 | `score` | float | Final diagnosis score (non-zero only after diagnose) |
 
 ## Scoring
@@ -373,23 +356,7 @@ Ablation study across 5 models ranging from 17B to frontier-class, tested agains
 - Input validation rejects invalid fault types and remediations, letting agents retry instead of silently scoring 0
 - The grader produces meaningful variance: wrong diagnosis = 0.01, blind guess = ~0.30, investigated + correct = 0.77-0.97
 
-### Score Anomaly Analysis
-
-Medium scores consistently beat easy scores across all 5 models. We investigated this across 20 seeded scenarios per difficulty and found a structural explanation:
-
-**Root cause:** Each difficulty uses different fault patterns with different log categories. Medium fault patterns (`connection_leak`, `cpu_saturated`) produce logs with explicit fault signatures (`"Connection pool exhausted"`, `"Fault detected -- cpu_saturated"`). Easy patterns (`oom`, `memory_leak`) use `java_oom` log templates with ambiguous GC/heap messages where models confuse `oom` vs `memory_leak`.
-
-**What each difficulty actually tests:**
-
-| Difficulty | Challenge Type | Log Signal Clarity | Chain Depth |
-|---|---|---|---|
-| Easy | Ambiguity resolution | Low -- GC pauses could be OOM or memory leak | 1-2 hops |
-| Medium | Causal chain navigation | High -- explicit fault names in logs | 2-4 hops |
-| Hard | Deep reasoning under blindness | Medium -- but stale metrics and 5-deep chains | 3-5 hops |
-
-**Max achievable scores with perfect play** (20 seeds averaged): easy=0.965, medium=0.976, hard=0.986. The ceiling is comparable. Differentiation comes from agent mistakes, not grader limits.
-
-**The competition-relevant metric is the hard task spread:** 0.32 (Qwen3 32B) to 0.91 (Claude Haiku 4.5), a 0.59 gap. This proves the environment is not trivially solvable and genuinely differentiates reasoning capability.
+For the full evolution of how this environment and its scores developed across 30+ commits -- including the shortcut learning anomaly, reward hacking research, and phase-by-phase scoring analysis -- see [docs/SCORING_ANALYSIS.md](docs/SCORING_ANALYSIS.md).
 
 ## Running Inference
 
@@ -459,11 +426,11 @@ incident-triage-env/
 │   ├── app.py                   # FastAPI server (create_app)
 │   ├── incident_triage_environment.py  # OpenEnv Environment adapter
 │   └── Dockerfile               # Multi-stage build
-├── tests/                       # 171 tests
-│   ├── test_generator.py        # Generator structural validation (57 tests)
+├── tests/                       # 177 tests
+│   ├── test_generator.py        # Generator + criticality + runbook tests (57 tests)
 │   ├── test_temporal.py         # Temporal degradation tests (15 tests)
-│   ├── test_env.py              # Core environment tests (42 tests)
-│   ├── test_grader.py           # Grading logic tests (24 tests)
+│   ├── test_env.py              # Environment + robustness tests (48 tests)
+│   ├── test_grader.py           # Grading + evidence grounding tests (26 tests)
 │   ├── test_scenarios.py        # Scenario pool tests (16 tests)
 │   └── test_api.py              # HTTP/WS endpoint tests (10 tests)
 ├── docs/

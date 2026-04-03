@@ -154,6 +154,8 @@ sequenceDiagram
 
 Final score = 70% diagnosis + 30% investigation quality + complexity nudge - blind penalty
 
+Anti-reward-hacking: evidence grounding (must have queried cited service), keyword stuffing detection (3+ fault type keywords halves bonus), input validation (invalid fault_type/remediation rejected with -0.02).
+
 ```mermaid
 flowchart TD
     A["Agent submits diagnose action"] --> B{"Service matches\nroot cause?"}
