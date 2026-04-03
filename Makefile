@@ -30,9 +30,10 @@ from incident_triage_env import IncidentTriageEnv, IncidentAction; \
 env = IncidentTriageEnv(task='easy'); \
 obs = env.reset(); \
 print('reset() works:', obs.incident_id); \
+svc = obs.available_services[0]; \
 obs, r, d, i = env.step(IncidentAction(action_type='check_topology')); \
 print('step() works, reward:', r); \
-obs, r, d, i = env.step(IncidentAction(action_type='diagnose', target_service='auth-service', fault_type='oom', remediation='restart')); \
+obs, r, d, i = env.step(IncidentAction(action_type='diagnose', target_service=svc, fault_type='oom', remediation='restart')); \
 print('diagnose works, score:', r, 'done:', d); \
 print('state():', list(env.state().keys())); \
 print('All smoke tests passed!')"
@@ -40,7 +41,7 @@ print('All smoke tests passed!')"
 # --- Docker ---------------------------------------------------------
 
 docker-build:
-	docker build -f server/Dockerfile -t incident-triage-env .
+	docker build -t incident-triage-env .
 
 docker-run:
 	docker run -p 8000:8000 -e PORT=8000 incident-triage-env
@@ -89,7 +90,7 @@ r = grade_diagnosis('x', 'y', 'z', {'service':'x','fault_type':'y','remediation'
 assert r['score'] == 1.0; \
 print('  Grader range: 0.0-1.0, perfect score works')"
 	@echo "4. Testing Docker build..."
-	docker build -f server/Dockerfile -t incident-triage-env . > /dev/null 2>&1 && echo "  Docker builds" || echo "  Docker build failed"
+	docker build -t incident-triage-env . > /dev/null 2>&1 && echo "  Docker builds" || echo "  Docker build failed"
 	@echo "=== All validations passed ==="
 
 # --- Clean ----------------------------------------------------------

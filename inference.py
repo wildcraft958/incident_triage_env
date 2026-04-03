@@ -73,7 +73,7 @@ def print_start(task: str, model: str) -> None:
 def print_step(step: int, action: IncidentAction, reward: float, done: bool, error: Any) -> None:
     action_str = format_action_str(action)
     done_str = "true" if done else "false"
-    error_str = str(error) if error else "null"
+    error_str = str(error).replace("\n", " ").replace("\r", "") if error else "null"
     print(
         f"[STEP] step={step} action={action_str} reward={reward:.2f} done={done_str} error={error_str}",
         flush=True,
@@ -82,7 +82,7 @@ def print_step(step: int, action: IncidentAction, reward: float, done: bool, err
 
 def print_end(success: bool, steps: int, rewards: list[float]) -> None:
     success_str = "true" if success else "false"
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
     print(f"[END] success={success_str} steps={steps} rewards={rewards_str}", flush=True)
 
 
@@ -191,7 +191,7 @@ def run_episode(task: str) -> None:
                     action = run_llm_action(client, messages)
                     consecutive_errors = 0
                 except Exception as exc:
-                    error_val = str(exc)
+                    error_val = str(exc).replace("\n", " ").replace("\r", "")
                     consecutive_errors += 1
                     # Emit a malformed-action step so [STEP] is always printed
                     steps += 1

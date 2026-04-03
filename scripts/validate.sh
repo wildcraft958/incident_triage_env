@@ -52,7 +52,7 @@ echo ""
 # 1. Required files
 # ------------------------------------------------------------------
 echo -e "${BOLD}1. Required files${NC}"
-for f in openenv.yaml models.py client.py inference.py README.md pyproject.toml server/app.py server/Dockerfile server/incident_triage_environment.py; do
+for f in openenv.yaml models.py client.py inference.py README.md pyproject.toml Dockerfile server/app.py server/incident_triage_environment.py; do
     if [ -f "$f" ]; then
         pass "$f"
     else
@@ -262,7 +262,7 @@ else
     if ! command -v docker &>/dev/null; then
         warn "Docker not installed, skipping"
     else
-        BUILD_OUT=$(docker build -f server/Dockerfile -t incident-triage-env . 2>&1)
+        BUILD_OUT=$(docker build -t incident-triage-env . 2>&1)
         if [ $? -eq 0 ]; then
             pass "docker build succeeded"
         else

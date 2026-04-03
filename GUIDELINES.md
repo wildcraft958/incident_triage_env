@@ -115,7 +115,7 @@ update_routes, resize_volume
 
 Before submission, ALL must pass:
 - [ ] `python -m pytest tests/ -v` -- all green
-- [ ] `docker build -f server/Dockerfile -t incident-triage-env .` -- succeeds
+- [ ] `docker build -t incident-triage-env .` -- succeeds
 - [ ] `docker run -p 8000:8000 incident-triage-env` -- serves on 8000
 - [ ] `curl localhost:8000/` -- returns 200
 - [ ] `curl -X POST localhost:8000/reset -d '{"task":"easy"}'` -- returns observation

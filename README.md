@@ -120,7 +120,7 @@ INFERENCE_DRY_RUN=1 python inference.py
 ## Docker
 
 ```bash
-docker build -f server/Dockerfile -t incident-triage-env .
+docker build -t incident-triage-env .
 docker run -p 8000:8000 incident-triage-env
 ```
 
@@ -428,10 +428,10 @@ incident-triage-env/
 │   ├── scenarios.py             # Scenario accessor (delegates to generator)
 │   ├── real_incidents.py        # Real post-mortem mappings
 │   └── log_templates.py         # Realistic log generators (LogHub patterns)
+├── Dockerfile                   # Multi-stage Docker build
 ├── server/
 │   ├── app.py                   # FastAPI server (create_app)
-│   ├── incident_triage_environment.py  # OpenEnv Environment adapter
-│   └── Dockerfile               # Multi-stage build
+│   └── incident_triage_environment.py  # OpenEnv Environment adapter
 ├── tests/                       # 177 tests
 │   ├── test_generator.py        # Generator + criticality + runbook tests (57 tests)
 │   ├── test_temporal.py         # Temporal degradation tests (15 tests)

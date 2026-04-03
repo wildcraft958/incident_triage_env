@@ -106,13 +106,17 @@ class IncidentTriageEnv:
 
         if atype not in _VALID_ACTION_TYPES:
             self.step_count += 1
-            obs = self._make_obs(f"Unknown action type: {atype!r}")
+            response_text = f"Unknown action type: {atype!r}"
+            self._response_history.append(response_text)
+            obs = self._make_obs(response_text)
             info = {"error": f"unknown_action_type: {atype}"}
             return obs, -0.02, False, info
 
         if atype in ("query_logs", "query_metrics", "check_runbook") and action.target_service is None:
             self.step_count += 1
-            obs = self._make_obs("target_service is required for this action.")
+            response_text = "target_service is required for this action."
+            self._response_history.append(response_text)
+            obs = self._make_obs(response_text)
             info = {"error": "target_service_required"}
             return obs, -0.02, False, info
 

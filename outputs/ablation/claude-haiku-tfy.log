@@ -1,0 +1,27 @@
+[START] task=easy env=incident_triage model=tfy-ai-bedrock/anthropic.claude-3-haiku-20240307-v1-0
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_logs(inventory-service) reward=0.05 done=false error=null
+[STEP] step=3 action=query_metrics(inventory-service) reward=0.03 done=false error=null
+[STEP] step=4 action=check_runbook(inventory-service) reward=0.02 done=false error=null
+[STEP] step=5 action=diagnose(inventory-service,oom,restart,2025-04-01T10:11:00Z [WARN] gc.GarbageCollector: G) reward=0.96 done=true error=null
+[END] success=true steps=5 rewards=0.02,0.05,0.03,0.02,0.96
+[START] task=medium env=incident_triage model=tfy-ai-bedrock/anthropic.claude-3-haiku-20240307-v1-0
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_logs(grpc-gateway) reward=0.00 done=false error=null
+[STEP] step=3 action=query_metrics(grpc-gateway) reward=0.00 done=false error=null
+[STEP] step=4 action=query_logs(order-service) reward=0.05 done=false error=null
+[STEP] step=5 action=query_metrics(order-service) reward=0.03 done=false error=null
+[STEP] step=6 action=query_logs(cert-manager) reward=0.05 done=false error=null
+[STEP] step=7 action=check_runbook(cert-manager) reward=0.02 done=false error=null
+[STEP] step=8 action=diagnose(cert-manager,config_error,rollback_config,The cert-manager logs show a config_error fault de) reward=-0.02 done=false error=invalid_diagnose_input: Error: invalid remediation 'rollback_config'. Valid: clear_disk, failover, fix_config, flush_dns, increase_pool, kill_threads, renew_certificate, resize_volume, restart, rollback, scale_up, update_routes
+[STEP] step=9 action=diagnose(cert-manager,config_error,fix_config,The cert-manager logs show a config_error fault de) reward=0.78 done=true error=null
+[END] success=true steps=9 rewards=0.02,0.00,0.00,0.05,0.03,0.05,0.02,-0.02,0.78
+[START] task=hard env=incident_triage model=tfy-ai-bedrock/anthropic.claude-3-haiku-20240307-v1-0
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(load-balancer) reward=0.00 done=false error=null
+[STEP] step=4 action=query_logs(kafka-consumer) reward=0.05 done=false error=null
+[STEP] step=5 action=query_logs(kafka-broker) reward=0.05 done=false error=null
+[STEP] step=6 action=query_metrics(kafka-broker) reward=0.03 done=false error=null
+[STEP] step=7 action=diagnose(kafka-broker,dns_failure,flush_dns,Logs show slow kafka requests and metrics show sta) reward=0.75 done=true error=null
+[END] success=true steps=7 rewards=0.02,0.03,0.00,0.05,0.05,0.03,0.75

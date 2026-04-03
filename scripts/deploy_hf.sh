@@ -79,8 +79,8 @@ if [ ! -f openenv.yaml ]; then
     exit 1
 fi
 
-if [ ! -f server/Dockerfile ]; then
-    echo -e "${RED}server/Dockerfile not found.${NC}"
+if [ ! -f Dockerfile ]; then
+    echo -e "${RED}Dockerfile not found.${NC}"
     exit 1
 fi
 
