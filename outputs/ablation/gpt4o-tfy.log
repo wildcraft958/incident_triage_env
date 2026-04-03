@@ -1,0 +1,30 @@
+[START] task=easy env=incident_triage model=openai-main/gpt-4o
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_logs(mysql-db) reward=0.05 done=false error=null
+[STEP] step=3 action=query_metrics(mysql-db) reward=0.03 done=false error=null
+[STEP] step=4 action=check_runbook(mysql-db) reward=0.02 done=false error=null
+[STEP] step=5 action=query_logs(notification-service) reward=0.00 done=false error=null
+[STEP] step=6 action=query_metrics(notification-service) reward=0.00 done=false error=null
+[STEP] step=7 action=query_logs(mongo-db) reward=0.00 done=false error=null
+[STEP] step=8 action=query_metrics(mongo-db) reward=0.00 done=false error=null
+[STEP] step=9 action=diagnose(mysql-db,disk_full,clear_disk,Alert indicates WAL accumulation filled disk. mysq) reward=0.94 done=true error=null
+[END] success=true steps=9 rewards=0.02,0.05,0.03,0.02,0.00,0.00,0.00,0.00,0.94
+[START] task=medium env=incident_triage model=openai-main/gpt-4o
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_metrics(elasticsearch) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(elasticsearch) reward=0.05 done=false error=null
+[STEP] step=4 action=query_metrics(order-service) reward=0.03 done=false error=null
+[STEP] step=5 action=query_logs(order-service) reward=0.05 done=false error=null
+[STEP] step=6 action=query_metrics(inventory-service) reward=0.03 done=false error=null
+[STEP] step=7 action=query_logs(inventory-service) reward=0.05 done=false error=null
+[STEP] step=8 action=check_runbook(elasticsearch) reward=0.02 done=false error=null
+[STEP] step=9 action=diagnose(elasticsearch,connection_leak,increase_pool,Log line: pool.ConnectionPool: Connection acquired) reward=0.98 done=true error=null
+[END] success=true steps=9 rewards=0.02,0.03,0.05,0.03,0.05,0.03,0.05,0.02,0.98
+[START] task=hard env=incident_triage model=openai-main/gpt-4o
+[STEP] step=1 action=check_topology() reward=0.02 done=false error=null
+[STEP] step=2 action=query_logs(rabbitmq) reward=0.05 done=false error=null
+[STEP] step=3 action=query_metrics(rabbitmq) reward=0.03 done=false error=null
+[STEP] step=4 action=check_runbook(rabbitmq) reward=0.02 done=false error=null
+[STEP] step=5 action=trace_request(rabbitmq) reward=0.04 done=false error=null
+[STEP] step=6 action=diagnose(rabbitmq,dependency_timeout,flush_dns,2025-04-01T10:13:00Z [ERROR] rabbitmq: Fault detec) reward=0.78 done=true error=null
+[END] success=true steps=6 rewards=0.02,0.05,0.03,0.02,0.04,0.78

@@ -170,12 +170,19 @@ After the safety audit (newline sanitization, empty rewards fix, Dockerfile cons
 |---|---|---|---|---|---|
 | Llama 4 Scout | 17B MoE | 0.95 | 0.85 | 0.85 | 0.88 |
 | Qwen3 | 32B | 0.83 | 0.59 | 0.86 | 0.76 |
+| Llama 3.3 | 70B | 0.76 | 0.84 | 0.87 | 0.82 |
 | GPT-4o-mini | Frontier | 0.96 | 0.87 | 0.89 | 0.91 |
+| GPT-4o | Frontier | 0.94 | 0.98 | 0.78 | 0.90 |
+| Gemini 2.5 Flash | Frontier | 0.96 | 0.84 | DNF | 0.90 |
 | Claude 3 Haiku | Frontier | 0.86 | 0.82 | 0.53 | 0.74 |
 
-Combined with Phase 6 results, the environment has now been tested across 8 models from 4 providers (Groq, OpenAI, Anthropic, Google). Score range: 0.53 to 0.97. Zero parse errors, zero format violations across all runs.
+Combined with Phase 6 results, the environment has been tested across 8 models from 4 providers (Groq, OpenAI, Anthropic, Google). Score range: 0.53 to 0.98. All runs produced valid `[START]/[STEP]/[END]` output, including graceful abort on Gemini's hard-task parse failures (truncated JSON from token limit).
 
-Qwen3 got 0.59 on medium (wrong remediation for connection_leak -- chose `restart` instead of `increase_pool`). Claude 3 Haiku got 0.53 on hard (misidentified fault type as `dependency_timeout`). Both demonstrate the grader correctly penalizes wrong answers even when the right service is identified.
+**Notable results:**
+- GPT-4o scored 0.98 on medium -- the highest score observed. It investigated 3 services, cross-referenced logs AND metrics for each, used runbook, and cited specific log lines in its diagnosis.
+- Qwen3 got 0.59 on medium (wrong remediation for connection_leak -- chose `restart` instead of `increase_pool`).
+- Claude 3 Haiku got 0.53 on hard (misidentified fault type as `dependency_timeout`).
+- Gemini 2.5 Flash DNF on hard -- its JSON response was truncated mid-string, triggering 3 consecutive parse errors and graceful abort. Easy and medium ran cleanly at 0.96 and 0.84.
 
 ## Test Coverage
 

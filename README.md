@@ -341,15 +341,16 @@ Tested across 8 models from 17B to frontier-class, spanning 4 providers (Groq, O
 |---|---|---|---|---|---|---|
 | Llama 4 Scout | 17B MoE | 0.95 | 0.85 | 0.85 | 0.88 | 6 |
 | Qwen3 | 32B | 0.83 | 0.59 | 0.86 | 0.76 | 5 |
-| Llama 3.3 | 70B | 0.78 | **0.97** | 0.86 | 0.87 | 7 |
-| GPT-4o-mini | Frontier | **0.96** | 0.87 | 0.89 | **0.91** | 5 |
-| Gemini 2.5 Flash | Frontier | 0.89 | 0.93 | 0.85 | 0.89 | 5 |
+| Llama 3.3 | 70B | 0.76 | 0.84 | 0.87 | 0.82 | 7 |
+| GPT-4o-mini | Frontier | 0.96 | 0.87 | 0.89 | 0.91 | 5 |
+| GPT-4o | Frontier | 0.94 | **0.98** | 0.78 | **0.90** | 8 |
+| Gemini 2.5 Flash | Frontier | **0.96** | 0.84 | DNF | 0.90 | 4 |
 | Claude 3 Haiku | Frontier | 0.86 | 0.82 | 0.53 | 0.74 | 7 |
 | Claude Haiku 4.5 | Frontier | 0.77 | 0.96 | **0.91** | 0.88 | 9 |
 
 ### Key Findings
 
-**Score range: 0.53 to 0.97 across 8 models.** The environment produces meaningful variance. Wrong diagnosis scores 0.01, blind guess scores around 0.30, and investigated + correct scores 0.77-0.97. Procedural generation means each run gets a different scenario, so scores vary between runs for the same model.
+**Score range: 0.53 to 0.98 across 8 models and 4 providers.** The environment produces meaningful variance. Wrong diagnosis scores 0.01, blind guess scores around 0.30, and investigated + correct scores 0.76-0.98. Procedural generation means each run gets a different scenario, so scores vary between runs for the same model.
 
 **Investigation depth correlates with hard task score.** Claude Haiku 4.5 used 9 steps on hard, cross-referencing logs and metrics, and scored 0.91. Claude 3 Haiku diagnosed in 7 steps on hard but misidentified the fault type, scoring 0.53. Qwen3 diagnosed in 5 steps, got the wrong remediation on medium, and scored 0.59.
 
