@@ -17,7 +17,7 @@ A trace-informed synthetic benchmark for production SRE incident triage across m
 
 Service topologies are generated as directed acyclic graphs with hotspot services and variable path lengths, informed by empirical analyses of Alibaba-scale microservice call graphs (Luo et al., 2021). Metric and log degradation patterns are aligned with public anomaly datasets such as LogHub and AIOps KPI benchmarks. The environment exposes a graph-structured, multi-signal state (topology, logs, metrics, alerts, traces) designed to benchmark root-cause reasoning similar in spirit to frameworks like MicroHECL and CHASE, but in a lightweight, reproducible OpenEnv form.
 
-Built for the [OpenEnv Hackathon](https://openenvhackathon.com/) (Scaler + HuggingFace + Meta).
+Built for the [Meta-PyTorch OpenEnv Hackathon](https://www.scaler.com/school-of-technology/meta-pytorch-hackathon) (Scaler + HuggingFace + Meta).
 
 ## Why This Exists
 
@@ -331,7 +331,7 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 
 ## Model Capability Benchmarks
 
-Ablation study across 5 models ranging from 17B to frontier-class, tested against the procedural generation engine with evidence grounding and anti-reward-hacking protections enabled. Each model ran all three task difficulties (easy/medium/hard). The evaluation mirrors the multi-signal root-cause analysis paradigm used by SOTA frameworks like MicroHECL and CHASE: agents must combine graph topology, temporal metrics, log evidence, and alert signals to localize faults, rather than relying on any single modality. Full run logs are in `outputs/ablation/`.
+Ablation study across 8 models ranging from 17B to frontier-class, tested against the procedural generation engine with evidence grounding and anti-reward-hacking protections enabled. Each model ran all three task difficulties (easy/medium/hard). The evaluation mirrors the multi-signal root-cause analysis paradigm used by SOTA frameworks like MicroHECL and CHASE: agents must combine graph topology, temporal metrics, log evidence, and alert signals to localize faults, rather than relying on any single modality. Full run logs are in `outputs/ablation/`.
 
 ### Score Comparison
 

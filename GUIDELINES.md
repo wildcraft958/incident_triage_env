@@ -3,7 +3,7 @@
 ## CODE STANDARDS
 
 ### Python
-- Python 3.11
+- Python 3.10+
 - Type hints on ALL functions and method signatures
 - Pydantic v2 for all data models
 - Docstrings on all public classes and methods
@@ -108,8 +108,8 @@ update_routes, resize_volume
 3. Partial credit MUST exist (not binary)
 4. Different quality of play MUST produce meaningfully different scores
 5. Easy task: competent agent scores 0.75+
-6. Medium task: competent agent scores 0.40-0.75
-7. Hard task: competent agent scores 0.15-0.50
+6. Medium task: competent agent scores 0.60-0.90
+7. Hard task: competent agent scores 0.50-0.90
 
 ## TESTING REQUIREMENTS
 
@@ -146,7 +146,7 @@ Before submission, ALL must pass:
 
 ## DOCKER RULES
 
-- Base image: python:3.11-slim
+- Base image: ghcr.io/meta-pytorch/openenv-base:latest
 - Expose port 8000 (configured in openenv.yaml)
 - No GPU required
 - No external service dependencies (no real databases, no Redis, etc.)

@@ -47,7 +47,7 @@ Ran the first real LLM inference against the procedural environment.
 
 **Commit:** `ff79dd5`
 
-Ran 5 models across all 3 difficulties to prove the environment differentiates model capability.
+Ran 5 models across all 3 difficulties to prove the environment differentiates model capability. (Later expanded to 8 models in Phase 7.)
 
 | Model | Parameters | Easy | Medium | Hard | Avg |
 |---|---|---|---|---|---|
@@ -93,7 +93,7 @@ Research on reward hacking (Lilian Weng, "Reward Hacking in RL", 2024) and the S
 
 **Commit:** `c733999`
 
-Re-ran all 5 models against the hardened environment.
+Re-ran the initial 5 models against the hardened environment.
 
 | Model | Parameters | Easy | Medium | Hard | Avg |
 |---|---|---|---|---|---|
@@ -114,7 +114,7 @@ Re-ran all 5 models against the hardened environment.
 
 **Commit:** `09f23d9`
 
-A pattern emerged across all 5 models: medium scores consistently beat easy scores. This is counterintuitive -- shouldn't easy be easier?
+A pattern emerged across the initial 5 models: medium scores consistently beat easy scores. This is counterintuitive -- shouldn't easy be easier?
 
 I investigated across 20 seeded scenarios per difficulty and found a structural explanation rooted in how LLMs process diagnostic information.
 
@@ -155,7 +155,7 @@ The hard task spread of 0.59 (Qwen3 0.32 to Claude Haiku 0.91) proves the enviro
 | Category (Weight) | What I Built | Target |
 |---|---|---|
 | Real-World Utility (30%) | SRE triage based on Meta/AWS/CrowdStrike post-mortems, PagerDuty/incident.io product space | 26-30 |
-| Task & Grader Quality (25%) | 3 tasks, deterministic grader, 0.59 hard spread across 5 models, anti-reward-hacking | 20-25 |
+| Task & Grader Quality (25%) | 3 tasks, deterministic grader, score range 0.53-0.98 across 8 models, anti-reward-hacking | 20-25 |
 | Environment Design (20%) | 7 actions, procedural DAGs, temporal sigmoid degradation, criticality tiering, runbooks | 16-20 |
 | Code Quality (15%) | 177 tests, openenv validate passes, Docker builds, HF Space deploys, typed models | 12-15 |
 | Creativity (10%) | Evidence grounding, shortcut learning analysis, chaos evaluator, 8-model ablation | 7-10 |
