@@ -174,6 +174,8 @@ def run_episode(task: str) -> None:
             ]
 
         dry_run_idx = 0
+        consecutive_errors = 0
+        max_consecutive_errors = 3
 
         while not obs.done:
             error_val = None
@@ -187,13 +189,18 @@ def run_episode(task: str) -> None:
             else:
                 try:
                     action = run_llm_action(client, messages)
+                    consecutive_errors = 0
                 except Exception as exc:
                     error_val = str(exc)
+                    consecutive_errors += 1
                     # Emit a malformed-action step so [STEP] is always printed
                     steps += 1
                     dummy = IncidentAction(action_type="__parse_error__")
                     rewards.append(-0.02)
                     print_step(steps, dummy, -0.02, False, error_val)
+                    if consecutive_errors >= max_consecutive_errors:
+                        print(f"[ERROR] {max_consecutive_errors} consecutive LLM errors, aborting episode", file=sys.stderr, flush=True)
+                        break
                     # Build a recovery prompt nudging the model back on track
                     messages.append(
                         {
