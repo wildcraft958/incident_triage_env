@@ -327,11 +327,11 @@ Rewards are distributed throughout the episode, not just at diagnosis:
 | Query irrelevant service | 0.00 | No penalty, no reward |
 | Repeated query (same action + service) | -0.01 | Discourages loops |
 | Invalid action | -0.02 | Missing fields, unknown type |
-| Max steps without diagnosis | 0.00 | Episode ends with score 0 |
+| Max steps without diagnosis | 0.01 | Episode ends with score 0.01 |
 
 ## Model Capability Benchmarks
 
-Ablation study across 8 models ranging from 17B to frontier-class, tested against the procedural generation engine with evidence grounding and anti-reward-hacking protections enabled. Each model ran all three task difficulties (easy/medium/hard). The evaluation mirrors the multi-signal root-cause analysis paradigm used by SOTA frameworks like MicroHECL and CHASE: agents must combine graph topology, temporal metrics, log evidence, and alert signals to localize faults, rather than relying on any single modality. Full run logs are in `outputs/ablation/`.
+Ablation study across 9 models ranging from 17B to frontier-class, tested against the procedural generation engine with evidence grounding and anti-reward-hacking protections enabled. Each model ran all three task difficulties (easy/medium/hard). The evaluation mirrors the multi-signal root-cause analysis paradigm used by SOTA frameworks like MicroHECL and CHASE: agents must combine graph topology, temporal metrics, log evidence, and alert signals to localize faults, rather than relying on any single modality. Full run logs are in `outputs/ablation/`.
 
 ### Score Comparison
 
@@ -354,7 +354,7 @@ Tested across 9 models from 17B to frontier-class, spanning 4 providers (Groq, O
 
 **Investigation depth correlates with hard task score.** Claude Haiku 4.5 used 9 steps on hard, cross-referencing logs and metrics, and scored 0.91. Llama 3.3 70B scored 0.80 on hard with 3 focused steps. Gemini 2.5 Flash Lite and Claude 3 Haiku both scored 0.52-0.53 on hard, showing the difficulty ceiling works.
 
-**Frontier models discover runbooks.** GPT-4o-mini, Claude Haiku, and Gemini all discovered and used `check_runbook` without being explicitly told to. This emergent behavior demonstrates the environment rewards methodical SRE investigation.
+**Frontier models discover runbooks.** GPT-4o, Claude Haiku, and Gemini all discovered and used `check_runbook` without being explicitly told to. This emergent behavior demonstrates the environment rewards methodical SRE investigation.
 
 **Anti-reward-hacking in action:**
 - Evidence grounding blocks hallucinated citations (agent must have queried the service it cites)
@@ -430,7 +430,7 @@ incident-triage-env/
 ├── server/
 │   ├── app.py                   # FastAPI server (create_app)
 │   └── incident_triage_environment.py  # OpenEnv Environment adapter
-├── tests/                       # 177 tests
+├── tests/                       # 183 tests
 │   ├── test_generator.py        # Generator + criticality + runbook tests (57 tests)
 │   ├── test_temporal.py         # Temporal degradation tests (15 tests)
 │   ├── test_env.py              # Environment + robustness tests (48 tests)

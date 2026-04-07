@@ -105,7 +105,7 @@ update_routes, resize_volume
 ## GRADING RULES
 
 1. Grading function MUST be pure -- same inputs -> same outputs ALWAYS
-2. Score MUST be in [0.0, 1.0]
+2. Score MUST be strictly in (0.01, 0.99) -- never exactly 0.0 or 1.0
 3. Partial credit MUST exist (not binary)
 4. Different quality of play MUST produce meaningfully different scores
 5. Easy task: competent agent scores 0.75+
@@ -141,7 +141,7 @@ Before submission, ALL must pass:
 | Diagnose: correct service | +0.40 | Or +0.15 if in causal chain |
 | Diagnose: correct fault type | +0.35 | Exact match only |
 | Diagnose: correct remediation | +0.25 | Exact match only |
-| Max steps reached without diagnosis | 0.00 | Episode ends, score = 0 |
+| Max steps reached without diagnosis | 0.01 | Episode ends, score = 0.01 |
 | Diagnose on step 1 (no investigation) | Apply score but no investigation bonus | Allowed but usually low |
 | Efficiency bonus | +0.05 | If diagnosed correctly in <= 50% of max steps |
 

@@ -155,10 +155,10 @@ The hard task spread of 0.59 (Qwen3 0.32 to Claude Haiku 0.91) proves the enviro
 | Category (Weight) | What I Built | Target |
 |---|---|---|
 | Real-World Utility (30%) | SRE triage based on Meta/AWS/CrowdStrike post-mortems, PagerDuty/incident.io product space | 26-30 |
-| Task & Grader Quality (25%) | 3 tasks, deterministic grader, score range 0.53-0.98 across 8 models, anti-reward-hacking | 20-25 |
+| Task & Grader Quality (25%) | 3 tasks (3 scenarios each), deterministic grader, score range 0.52-0.97 across 9 models, anti-reward-hacking | 20-25 |
 | Environment Design (20%) | 7 actions, procedural DAGs, temporal sigmoid degradation, criticality tiering, runbooks | 16-20 |
-| Code Quality (15%) | 177 tests, openenv validate passes, Docker builds, HF Space deploys, typed models | 12-15 |
-| Creativity (10%) | Evidence grounding, shortcut learning analysis, chaos evaluator, 8-model ablation | 7-10 |
+| Code Quality (15%) | 183 tests, openenv validate passes, Docker builds, HF Space deploys, typed models | 12-15 |
+| Creativity (10%) | Evidence grounding, shortcut learning analysis, chaos evaluator, 9-model ablation | 7-10 |
 
 ## Phase 7: Final 8-Model Ablation
 
@@ -186,15 +186,41 @@ Combined with Phase 6 results, the environment has been tested across 8 models f
 
 ## Test Coverage
 
-177 tests across 6 test files:
+183 tests across 6 test files:
 - Generator: structural validation, criticality tiering, runbook generation (57 tests)
 - Temporal: sigmoid degradation, causal delays, log revelation (15 tests)
-- Environment: all actions, edge cases, robustness, evidence grounding (48 tests)
+- Environment: all actions, edge cases, robustness, evidence grounding, strict score range (54 tests)
 - Grader: determinism, partial credit, evidence scoring, criticality (26 tests)
 - Scenarios: pool validation (16 tests)
 - API: HTTP/WebSocket endpoints (10 tests)
 
 All pass. `validate.sh --no-docker` passes 26/26 checks.
+
+## Phase 8: Score Clamping, [END] Format Fix, Fresh Benchmarks
+
+**Commits:** `17f9550` through `c4cee63`
+
+Submission #5 failed Phase 2 validation with "task scores out of range." Two bugs were found and fixed:
+
+1. **Score clamping:** Final task scores were clamped to `[0.0, 1.0]` but the validator requires strictly `(0, 1)`. Changed to `min(0.99, max(0.01, ...))` in `env.py`. Added floor of 0.01 for timeout episodes (max_steps without diagnosis).
+2. **Missing `score=` in [END] line:** The competition's sample inference script requires `[END] success=<bool> steps=<n> score=<score> rewards=<r1,...>` but `print_end()` omitted the `score=` field. The validator likely defaulted to 0.0 for the missing field.
+
+**Additional improvements:**
+- Added 3rd hard scenario (now 3/3/3 parity across difficulties)
+- Fixed `success` threshold from `env.score > 0.0` to `env.score > 0.3`
+- Added `TestScoreStrictRange` test class (6 tests)
+- Re-ran 6 models on the latest scoring engine via TrueFoundry
+
+| Model | Parameters | Easy | Medium | Hard | Avg |
+|---|---|---|---|---|---|
+| Llama 4 Scout | 17B MoE | 0.96 | 0.77 | 0.75 | 0.83 |
+| Qwen3 | 32B | 0.96 | 0.83 | 0.55 | 0.78 |
+| Llama 3.3 | 70B | 0.96 | 0.90 | 0.80 | 0.89 |
+| GPT-4o | Frontier | 0.71 | 0.93 | 0.85 | 0.83 |
+| Gemini 2.5 Flash | Frontier | 0.94 | 0.97 | 0.53 | 0.81 |
+| Gemini 2.5 Flash Lite | Frontier | 0.91 | 0.79 | 0.52 | 0.74 |
+
+Submission #6 passed Phase 2 validation and entered the judging queue.
 
 ## Benchmark Positioning
 
