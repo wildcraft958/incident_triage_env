@@ -225,7 +225,7 @@ def run_episode(task: str) -> None:
                     break
                 messages.append({"role": "user", "content": next_content})
 
-        success = env.score > 0.0
+        success = env.score > 0.3
     except Exception as exc:
         error_val = str(exc)
         print(f"[ERROR] Unhandled exception: {error_val}", file=sys.stderr, flush=True)

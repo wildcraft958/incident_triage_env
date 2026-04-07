@@ -6,7 +6,6 @@ Logs are adapted from log_templates.py patterns to feel like real production out
 Incidents are grounded in real post-mortems tracked in real_incidents.py.
 """
 
-import random
 from typing import Dict, List
 
 from .generator import ProceduralScenarioGenerator
@@ -1269,7 +1268,7 @@ MEDIUM_SCENARIOS: List[Dict] = [
     ProceduralScenarioGenerator(seed=100 + i).generate("medium") for i in range(3)
 ]
 HARD_SCENARIOS: List[Dict] = [
-    ProceduralScenarioGenerator(seed=200 + i).generate("hard") for i in range(2)
+    ProceduralScenarioGenerator(seed=200 + i).generate("hard") for i in range(3)
 ]
 
 
