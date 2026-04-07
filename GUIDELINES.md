@@ -29,7 +29,7 @@ This is the EXACT format. Any deviation = incorrect evaluation scoring.
 ```
 [START] task=<task_name> env=<benchmark> model=<model_name>
 [STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
-[END] success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
+[END] success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
 ```
 
 Rules:
@@ -37,6 +37,7 @@ Rules:
 - One [STEP] per env.step() call, immediately after it returns
 - One [END] after env.close(), ALWAYS emitted even on exception
 - reward/rewards formatted to 2 decimal places
+- score is the final task score formatted to 2 decimal places
 - done/success are lowercase: true or false
 - error is raw string or null
 - All fields on single line, no newlines within
@@ -46,8 +47,8 @@ Example:
 [START] task=easy env=incident_triage model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
 [STEP] step=2 action=query_logs(auth-service) reward=0.05 done=false error=null
-[STEP] step=3 action=diagnose(auth-service,oom,restart) reward=1.00 done=true error=null
-[END] success=true steps=3 rewards=0.02,0.05,1.00
+[STEP] step=3 action=diagnose(auth-service,oom,restart) reward=0.85 done=true error=null
+[END] success=true steps=3 score=0.85 rewards=0.02,0.05,0.85
 ```
 
 ## ENVIRONMENT VARIABLES (MANDATORY)
