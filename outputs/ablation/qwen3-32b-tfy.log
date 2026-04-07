@@ -1,20 +1,21 @@
 [START] task=easy env=incident_triage model=groq/qwen-qwen3-32b
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(notification-service) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(notification-service) reward=0.05 done=false error=null
-[STEP] step=4 action=diagnose(notification-service,oom,scale_up,Log shows G1 GC pause of 4391ms with heap at 3.9GB) reward=0.83 done=true error=null
-[END] success=true steps=4 rewards=0.02,0.03,0.05,0.83
+[STEP] step=2 action=query_metrics(payment-service) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(payment-service) reward=0.05 done=false error=null
+[STEP] step=4 action=diagnose(payment-service,oom,restart,Log line: 'GC pause (G1 Evacuation Pause) 5822ms -) reward=0.96 done=true error=null
+[END] success=true steps=4 score=0.96 rewards=0.02,0.03,0.05,0.96
 [START] task=medium env=incident_triage model=groq/qwen-qwen3-32b
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(payment-service) reward=0.03 done=false error=null
-[STEP] step=3 action=check_runbook(payment-service) reward=0.02 done=false error=null
-[STEP] step=4 action=query_logs(payment-service) reward=0.05 done=false error=null
-[STEP] step=5 action=diagnose(payment-service,connection_leak,restart,2025-04-01T10:14:00Z [INFO] gateway.HealthCheck: H) reward=0.59 done=true error=null
-[END] success=true steps=5 rewards=0.02,0.03,0.02,0.05,0.59
+[STEP] step=2 action=query_logs(api-gateway) reward=0.00 done=false error=null
+[STEP] step=3 action=query_logs(profile-service) reward=0.05 done=false error=null
+[STEP] step=4 action=query_logs(kafka-consumer) reward=0.05 done=false error=null
+[STEP] step=5 action=diagnose(kafka-consumer,config_error,fix_config,2025-04-01T10:10:00Z [ERROR] kafka-consumer: Fault) reward=0.83 done=true error=null
+[END] success=true steps=5 score=0.83 rewards=0.02,0.00,0.05,0.05,0.83
 [START] task=hard env=incident_triage model=groq/qwen-qwen3-32b
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(session-service) reward=0.03 done=false error=null
-[STEP] step=3 action=check_runbook(session-service) reward=0.02 done=false error=null
-[STEP] step=4 action=query_logs(session-service) reward=0.05 done=false error=null
-[STEP] step=5 action=diagnose(session-service,thread_deadlock,kill_threads,2025-04-01T10:10:00Z [ERROR] session-service: Faul) reward=0.86 done=true error=null
-[END] success=true steps=5 rewards=0.02,0.03,0.02,0.05,0.86
+[STEP] step=2 action=query_metrics(kafka-broker) reward=0.03 done=false error=null
+[STEP] step=3 action=query_logs(kafka-broker) reward=0.05 done=false error=null
+[STEP] step=4 action=query_metrics(config-service) reward=0.03 done=false error=null
+[STEP] step=5 action=check_runbook(config-service) reward=0.02 done=false error=null
+[STEP] step=6 action=diagnose(config-service,certificate_expired,renew_certificate,kafka-broker logs show config-service timeouts; co) reward=0.55 done=true error=null
+[END] success=true steps=6 score=0.55 rewards=0.02,0.03,0.05,0.03,0.02,0.55

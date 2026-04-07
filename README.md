@@ -335,25 +335,24 @@ Ablation study across 8 models ranging from 17B to frontier-class, tested agains
 
 ### Score Comparison
 
-Tested across 9 models from 17B to frontier-class, spanning 5 providers (Groq, OpenAI, Anthropic, Google, TrueFoundry). Each model ran all three task difficulties with procedurally generated scenarios.
+Tested across 9 models from 17B to frontier-class, spanning 4 providers (Groq, OpenAI, Anthropic, Google). Each model ran all three task difficulties with procedurally generated scenarios. Latest scores reflect the current scoring engine with evidence grounding and anti-reward-hacking protections.
 
 | Model | Parameters | Easy | Medium | Hard | Avg | Steps (avg) |
 |---|---|---|---|---|---|---|
-| Llama 4 Scout | 17B MoE | 0.95 | 0.85 | 0.85 | 0.88 | 6 |
-| Qwen3 | 32B | 0.83 | 0.59 | 0.86 | 0.76 | 5 |
-| Llama 3.3 | 70B | 0.76 | 0.84 | 0.87 | 0.82 | 7 |
-| GPT-4o-mini | Frontier | 0.96 | 0.87 | 0.89 | 0.91 | 5 |
-| GPT-4o | Frontier | 0.94 | **0.98** | 0.78 | **0.90** | 8 |
-| Gemini 2.5 Flash | Frontier | **0.96** | 0.84 | DNF | 0.90 | 4 |
+| Llama 4 Scout | 17B MoE | 0.96 | 0.77 | 0.75 | 0.83 | 6 |
+| Qwen3 | 32B | 0.96 | 0.83 | 0.55 | 0.78 | 5 |
+| Llama 3.3 | 70B | 0.96 | 0.90 | 0.80 | 0.89 | 6 |
+| GPT-4o | Frontier | 0.71 | 0.93 | 0.85 | 0.83 | 6 |
+| Gemini 2.5 Flash | Frontier | 0.94 | **0.97** | 0.53 | 0.81 | 8 |
 | Gemini 2.5 Flash Lite | Frontier | 0.91 | 0.79 | 0.52 | 0.74 | 4 |
 | Claude 3 Haiku | Frontier | 0.86 | 0.82 | 0.53 | 0.74 | 7 |
-| Claude Haiku 4.5 | Frontier | 0.77 | 0.96 | **0.91** | 0.88 | 9 |
+| Claude Haiku 4.5 | Frontier | 0.77 | 0.96 | **0.91** | **0.88** | 9 |
 
 ### Key Findings
 
-**Score range: 0.52 to 0.98 across 9 models and 5 providers.** The environment produces meaningful variance. Wrong diagnosis scores 0.01, blind guess scores around 0.30, and investigated + correct scores 0.76-0.98. Procedural generation means each run gets a different scenario, so scores vary between runs for the same model.
+**Score range: 0.52 to 0.97 across 9 models and 4 providers.** The environment produces meaningful variance. Wrong diagnosis scores 0.01, blind guess scores around 0.30, and investigated + correct scores 0.71-0.96. Procedural generation means each run gets a different scenario, so scores vary between runs for the same model.
 
-**Investigation depth correlates with hard task score.** Claude Haiku 4.5 used 9 steps on hard, cross-referencing logs and metrics, and scored 0.91. Claude 3 Haiku diagnosed in 7 steps on hard but misidentified the fault type, scoring 0.53. Qwen3 diagnosed in 5 steps, got the wrong remediation on medium, and scored 0.59.
+**Investigation depth correlates with hard task score.** Claude Haiku 4.5 used 9 steps on hard, cross-referencing logs and metrics, and scored 0.91. Llama 3.3 70B scored 0.80 on hard with 3 focused steps. Gemini 2.5 Flash Lite and Claude 3 Haiku both scored 0.52-0.53 on hard, showing the difficulty ceiling works.
 
 **Frontier models discover runbooks.** GPT-4o-mini, Claude Haiku, and Gemini all discovered and used `check_runbook` without being explicitly told to. This emergent behavior demonstrates the environment rewards methodical SRE investigation.
 

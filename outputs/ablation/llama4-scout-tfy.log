@@ -1,23 +1,24 @@
 [START] task=easy env=incident_triage model=groq/meta-llama-llama-4-scout-17b-16e-instruct
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(mongo-db) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(mongo-db) reward=0.05 done=false error=null
-[STEP] step=4 action=query_metrics(search-service) reward=0.00 done=false error=null
-[STEP] step=5 action=query_logs(search-service) reward=0.00 done=false error=null
-[STEP] step=6 action=check_runbook(mongo-db) reward=0.02 done=false error=null
-[STEP] step=7 action=diagnose(mongo-db,disk_full,clear_disk,WAL accumulation filled disk, disk_usage_pct: 50.8) reward=0.95 done=true error=null
-[END] success=true steps=7 rewards=0.02,0.03,0.05,0.00,0.00,0.02,0.95
+[STEP] step=2 action=check_alerts() reward=0.03 done=false error=null
+[STEP] step=3 action=query_metrics(config-service) reward=0.03 done=false error=null
+[STEP] step=4 action=query_logs(config-service) reward=0.05 done=false error=null
+[STEP] step=5 action=diagnose(config-service,certificate_expired,renew_certificate,2025-04-01T10:13:00Z [ERROR] config-service: Fault) reward=0.96 done=true error=null
+[END] success=true steps=5 score=0.96 rewards=0.02,0.03,0.03,0.05,0.96
 [START] task=medium env=incident_triage model=groq/meta-llama-llama-4-scout-17b-16e-instruct
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(kafka-consumer) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(kafka-consumer) reward=0.05 done=false error=null
-[STEP] step=4 action=query_metrics(order-service) reward=0.03 done=false error=null
-[STEP] step=5 action=query_logs(order-service) reward=0.05 done=false error=null
-[STEP] step=6 action=diagnose(kafka-consumer,cpu_saturated,restart,kafka-consumer CPU at 100%, error rate 1.8%, laten) reward=0.85 done=true error=null
-[END] success=true steps=6 rewards=0.02,0.03,0.05,0.03,0.05,0.85
+[STEP] step=2 action=query_logs(grpc-gateway) reward=0.00 done=false error=null
+[STEP] step=3 action=query_metrics(grpc-gateway) reward=0.00 done=false error=null
+[STEP] step=4 action=query_logs(payment-service) reward=0.05 done=false error=null
+[STEP] step=5 action=query_logs(network-controller) reward=0.05 done=false error=null
+[STEP] step=6 action=check_runbook(network-controller) reward=0.02 done=false error=null
+[STEP] step=7 action=diagnose(network-controller,config_error,rollback config,Fault detected -- config_error) reward=-0.02 done=false error=invalid_diagnose_input: Error: invalid remediation 'rollback config'. Valid: clear_disk, failover, fix_config, flush_dns, increase_pool, kill_threads, renew_certificate, resize_volume, restart, rollback, scale_up, update_routes
+[STEP] step=8 action=diagnose(network-controller,config_error,restart,Fault detected -- config_error) reward=0.77 done=true error=null
+[END] success=true steps=8 score=0.77 rewards=0.02,0.00,0.00,0.05,0.05,0.02,-0.02,0.77
 [START] task=hard env=incident_triage model=groq/meta-llama-llama-4-scout-17b-16e-instruct
 [STEP] step=1 action=check_topology() reward=0.02 done=false error=null
-[STEP] step=2 action=query_metrics(search-service) reward=0.03 done=false error=null
-[STEP] step=3 action=query_logs(search-service) reward=0.05 done=false error=null
-[STEP] step=4 action=diagnose(search-service,thread_deadlock,kill_threads,2025-04-01T10:12:00Z [ERROR] search-service: Fault) reward=0.85 done=true error=null
-[END] success=true steps=4 rewards=0.02,0.03,0.05,0.85
+[STEP] step=2 action=query_logs(edge-proxy) reward=0.00 done=false error=null
+[STEP] step=3 action=query_logs(notification-service) reward=0.05 done=false error=null
+[STEP] step=4 action=query_logs(kafka-broker) reward=0.05 done=false error=null
+[STEP] step=5 action=diagnose(kafka-broker,dns_failure,restart,Fault detected -- dns_failure) reward=0.75 done=true error=null
+[END] success=true steps=5 score=0.75 rewards=0.02,0.00,0.05,0.05,0.75
