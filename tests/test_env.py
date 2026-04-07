@@ -569,6 +569,60 @@ class TestEvidenceGrounding:
         assert score_focused >= score_stuffed
 
 
+class TestScoreStrictRange:
+    """Final task scores must be strictly in (0, 1) -- validator rejects 0.0 and 1.0."""
+
+    def test_perfect_diagnosis_score_below_one(self):
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        gt = env.scenario["root_cause"]
+        env.step(IncidentAction(action_type="check_topology"))
+        env.step(IncidentAction(action_type="query_logs", target_service=gt["service"]))
+        env.step(IncidentAction(action_type="query_metrics", target_service=gt["service"]))
+        _, score, _, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+        assert 0 < score < 1, f"Score {score} must be strictly in (0, 1)"
+        assert 0 < env.score < 1
+
+    def test_wrong_diagnosis_score_above_zero(self):
+        env = IncidentTriageEnv(task="easy")
+        env.reset()
+        wrong_svc = [s for s in env.scenario["services"] if s != env.scenario["root_cause"]["service"]]
+        svc = wrong_svc[0] if wrong_svc else env.scenario["services"][0]
+        _, score, _, _ = env.step(IncidentAction(
+            action_type="diagnose",
+            target_service=svc,
+            fault_type="dns_failure",
+            remediation="flush_dns",
+        ))
+        assert 0 < score < 1, f"Score {score} must be strictly in (0, 1)"
+        assert 0 < env.score < 1
+
+    def test_timeout_score_above_zero(self):
+        env = IncidentTriageEnv(task="easy", max_steps=2)
+        env.reset()
+        env.step(IncidentAction(action_type="check_topology"))
+        _, _, done, _ = env.step(IncidentAction(action_type="check_topology"))
+        assert done is True
+        assert 0 < env.score < 1, f"Timeout score {env.score} must be strictly in (0, 1)"
+
+    @pytest.mark.parametrize("task", ["easy", "medium", "hard"])
+    def test_all_tasks_score_in_range(self, task):
+        env = IncidentTriageEnv(task=task)
+        env.reset()
+        gt = env.scenario["root_cause"]
+        env.step(IncidentAction(action_type="diagnose",
+            target_service=gt["service"],
+            fault_type=gt["fault_type"],
+            remediation=gt["remediation"],
+        ))
+        assert 0 < env.score < 1, f"Task {task} score {env.score} out of range"
+
+
 class TestDiagnoseValidation:
     """Diagnose must validate fault_type, remediation, and target_service."""
 

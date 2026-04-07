@@ -165,6 +165,8 @@ class IncidentTriageEnv:
 
         if self.step_count >= self.max_steps and not done:
             done = True
+            if self.score == 0.0:
+                self.score = 0.01
 
         self.done = done
         obs = self._make_obs(response)
@@ -397,7 +399,7 @@ class IncidentTriageEnv:
         # still produce different scores across scenarios
         complexity_nudge = round(num_services * 0.003, 3)
         combined = (diag_score * 0.70) + (invest_normalized * 0.30) + complexity_nudge
-        combined = min(1.0, max(0.0, round(combined, 3)))
+        combined = min(0.99, max(0.01, round(combined, 3)))
 
         self.score = combined
         self.done = True
