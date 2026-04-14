@@ -59,26 +59,18 @@ flowchart TD
     G --> H["effective = (progress - delay) / (1 - delay)"]
     H --> I["sigmoid = 1 / (1 + exp(-10 x (t - 0.5)))"]
     I --> J["metric = baseline + (crisis - baseline) x sigmoid"]
-    J --> K["Return degraded metrics"]
+    J --> K["Return metrics"]
+    D --> K
 ```
 
 ### Difficulty Progression
 
 ```mermaid
 flowchart LR
-    subgraph Easy["Easy"]
-        E1["3-4 services"] --- E2["1-2 deep chain"] --- E3["Clear error logs"] --- E4["OOM, disk full, cert expiry"]
-    end
-
-    subgraph Medium["Medium"]
-        M1["4-6 services"] --- M2["2-4 deep chain"] --- M3["Red herrings + noise alerts"] --- M4["Connection leak, config push, thundering herd"]
-    end
-
-    subgraph Hard["Hard"]
-        H1["6-9 services"] --- H2["3-5 deep chain"] --- H3["Monitoring blindness + stale metrics"] --- H4["Kafka staleness, DNS failure, memory leak, deadlock"]
-    end
-
-    Easy --> Medium --> Hard
+    EA["Easy<br/>3-4 services, 1-2 deep chain<br/>Clear error logs<br/>OOM / disk full / cert expiry"]
+    MD["Medium<br/>4-6 services, 2-4 deep chain<br/>Red herrings and noise alerts<br/>Connection leak / config push / thundering herd"]
+    HD["Hard<br/>6-9 services, 3-5 deep chain<br/>Monitoring blindness, stale metrics<br/>Kafka staleness / DNS failure / deadlock"]
+    EA --> MD --> HD
 ```
 
 ## Quick Start
