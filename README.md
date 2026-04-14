@@ -36,7 +36,7 @@ This environment fills that gap. It is a controlled, high-fidelity simulator -- 
 ```mermaid
 graph TB
     A[Agent / inference.py] -->|"reset(task='easy')"| B[IncidentTriageEnv]
-    B -->|Observation: incident summary, services| A
+    B -->|"Observation: incident summary, services"| A
     A -->|"step(query_logs, 'auth-service')"| B
     B -->|"Observation: log lines, reward=0.05"| A
     A -->|"step(diagnose, service, fault, fix, evidence)"| B
@@ -45,9 +45,9 @@ graph TB
     B --> C[ProceduralScenarioGenerator]
     B --> D[TemporalSimulator]
     B --> E[grader.py]
-    C --> F["networkx DAG topologies\n12 fault patterns\n40+ service names"]
-    D --> G["Sigmoid degradation\nCausal hop delays\nProgressive log reveal"]
-    E --> H["Diagnosis + Evidence scoring\n(0.0 - 1.0, partial credit)"]
+    C --> F["networkx DAG topologies<br/>12 fault patterns<br/>40+ service names"]
+    D --> G["Sigmoid degradation<br/>Causal hop delays<br/>Progressive log reveal"]
+    E --> H["Diagnosis + Evidence scoring<br/>(0.0 - 1.0, partial credit)"]
 ```
 
 Services are tagged with **criticality tiers** (Tier 1 = critical infrastructure, Tier 2 = application, Tier 3 = observability) visible in topology output. Agents can consult per-service **runbooks** listing known failure modes and standard remediation, just like real SREs.
@@ -59,14 +59,14 @@ Metrics degrade along sigmoid curves. Services further from the root cause start
 ```mermaid
 flowchart TD
     A["Agent calls query_metrics(service)"] --> B["TemporalSimulator.compute_metrics()"]
-    B --> C{"Is service in\ncausal chain?"}
-    C -->|"No"| D["Return baseline\n(stable, healthy)"]
+    B --> C{"Is service in<br/>causal chain?"}
+    C -->|"No"| D["Return baseline<br/>(stable, healthy)"]
     C -->|"Yes"| E["Compute effective progress"]
-    E --> F["progress = step / (max_steps * 0.75)"]
-    F --> G["onset_delay = distance * 0.20"]
+    E --> F["progress = step / max_steps x 0.75"]
+    F --> G["onset_delay = distance x 0.20"]
     G --> H["effective = (progress - delay) / (1 - delay)"]
-    H --> I["sigmoid = 1 / (1 + exp(-10 * (t - 0.5)))"]
-    I --> J["metric = baseline + (crisis - baseline) * sigmoid"]
+    H --> I["sigmoid = 1 / (1 + exp(-10 x (t - 0.5)))"]
+    I --> J["metric = baseline + (crisis - baseline) x sigmoid"]
     J --> K["Return degraded metrics"]
 ```
 
@@ -271,19 +271,19 @@ Seven investigation actions that mirror what real SREs do:
 The final score combines diagnosis accuracy (70%) and investigation quality (30%):
 
 ```mermaid
-graph LR
-    subgraph "Diagnosis Score (70%)"
-        S["Correct service\n+0.40"] --- F["Correct fault type\n+0.35"]
-        F --- R["Correct remediation\n+0.25"]
-        R --- EV["Evidence bonus\nup to +0.10"]
+flowchart LR
+    subgraph Diagnosis["Diagnosis Score (70%)"]
+        S["Correct service<br/>+0.40"] --> FF["Correct fault type<br/>+0.35"]
+        FF --> R["Correct remediation<br/>+0.25"]
+        R --> EV["Evidence bonus<br/>up to +0.10"]
     end
-    subgraph "Investigation Quality (30%)"
-        T["Topology timing"] --- C["Chain coverage"]
-        C --- X["Cross-referencing"]
-        X --- FO["Focus ratio"]
+    subgraph Investigation["Investigation Quality (30%)"]
+        T["Topology timing"] --> CC["Chain coverage"]
+        CC --> X["Cross-referencing"]
+        X --> FO["Focus ratio"]
     end
-    subgraph "Penalties"
-        B["Blind diagnosis\n-0.30 (0 steps)\n-0.15 (1 step)\n-0.05 (2 steps)"]
+    subgraph Penalties
+        B["Blind diagnosis<br/>-0.30 at 0 steps<br/>-0.15 at 1 step<br/>-0.05 at 2 steps"]
     end
 ```
 

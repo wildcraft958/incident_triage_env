@@ -20,12 +20,12 @@ graph TB
         end
 
         subgraph GEN["Procedural Engine"]
-            PROC["generator.py\nnetworkx DAGs\n12 fault patterns"]
-            TEMP["temporal.py\nSigmoid degradation\nCausal hop delays"]
+            PROC["generator.py<br/>networkx DAGs<br/>12 fault patterns"]
+            TEMP["temporal.py<br/>Sigmoid degradation<br/>Causal hop delays"]
         end
 
         subgraph SCORE["Scoring"]
-            GR["grader.py\nDiagnosis + Evidence scoring"]
+            GR["grader.py<br/>Diagnosis + Evidence scoring"]
         end
 
         API --> ENV
@@ -54,16 +54,16 @@ The architecture is informed by three lines of research in microservice observab
 ```mermaid
 flowchart TD
     START(("Start")) --> RESET["reset(task)"]
-    RESET -->|"Generator creates\nfresh scenario"| GEN["ProceduralScenarioGenerator"]
+    RESET -->|"Generator creates fresh scenario"| GEN["ProceduralScenarioGenerator"]
     GEN --> TEMPORAL["TemporalSimulator initialized"]
     TEMPORAL --> RUNNING["Running"]
-    RUNNING -->|"query_logs / query_metrics\ncheck_topology / trace_request\ncheck_alerts"| PROCESS["Process Action"]
-    PROCESS --> DEGRADE["Temporal: compute\nmetrics at current step"]
+    RUNNING -->|"query_logs / query_metrics<br/>check_topology / trace_request / check_alerts"| PROCESS["Process Action"]
+    PROCESS --> DEGRADE["Temporal: compute<br/>metrics at current step"]
     DEGRADE --> REWARD["Compute Reward"]
     REWARD --> UPDATE["Update State"]
     UPDATE --> OBS["Return Observation"]
     OBS -->|"done = false"| RUNNING
-    RUNNING -->|"diagnose action\nor max_steps reached"| DONE["Done"]
+    RUNNING -->|"diagnose action or max_steps reached"| DONE["Done"]
     DONE -->|"Can reset"| RESET
     DONE --> END(("End"))
 ```
@@ -73,23 +73,23 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph INPUT["Configuration"]
-        DIFF["difficulty:\neasy/medium/hard"]
-        SEED["optional seed\nfor reproducibility"]
+        DIFF["difficulty:<br/>easy/medium/hard"]
+        SEED["optional seed<br/>for reproducibility"]
     end
 
     subgraph GENERATOR["ProceduralScenarioGenerator"]
-        FP["Pick fault pattern\n(12 available)"]
-        TOPO["Build networkx DAG\n(3-9 services)"]
-        RC["Select root cause\n+ causal chain"]
-        SYNTH["Synthesize:\nlogs, metrics,\nalerts, traces"]
+        FP["Pick fault pattern<br/>(12 available)"]
+        TOPO["Build networkx DAG<br/>(3-9 services)"]
+        RC["Select root cause<br/>+ causal chain"]
+        SYNTH["Synthesize:<br/>logs, metrics,<br/>alerts, traces"]
     end
 
     subgraph OUTPUT["Scenario Dict"]
         SVC["services + topology"]
-        BASELINE["metrics_baseline\n(healthy state)"]
-        CRISIS["metrics_crisis\n(full cascade)"]
+        BASELINE["metrics_baseline<br/>(healthy state)"]
+        CRISIS["metrics_crisis<br/>(full cascade)"]
         LOGS["logs per service"]
-        CHAIN["causal_chain +\ncausal_distances"]
+        CHAIN["causal_chain +<br/>causal_distances"]
     end
 
     INPUT --> GENERATOR
@@ -101,14 +101,14 @@ flowchart LR
 ```mermaid
 flowchart TD
     A["Agent calls query_metrics(service)"] --> B["TemporalSimulator.compute_metrics()"]
-    B --> C{"Is service in\ncausal chain?"}
-    C -->|"No"| D["Return baseline\n(stable, healthy)"]
+    B --> C{"Is service in<br/>causal chain?"}
+    C -->|"No"| D["Return baseline<br/>(stable, healthy)"]
     C -->|"Yes"| E["Compute effective progress"]
-    E --> F["progress = step / (max_steps * 0.75)"]
-    F --> G["onset_delay = distance * 0.20"]
+    E --> F["progress = step / max_steps x 0.75"]
+    F --> G["onset_delay = distance x 0.20"]
     G --> H["effective = (progress - delay) / (1 - delay)"]
-    H --> I["sigmoid = 1 / (1 + exp(-10 * (t - 0.5)))"]
-    I --> J["metric = baseline + (crisis - baseline) * sigmoid"]
+    H --> I["sigmoid = 1 / (1 + exp(-10 x (t - 0.5)))"]
+    I --> J["metric = baseline + (crisis - baseline) x sigmoid"]
     J --> K["Return degraded metrics"]
 ```
 
@@ -166,7 +166,7 @@ Anti-reward-hacking: evidence grounding (must have queried cited service), keywo
 
 ```mermaid
 flowchart TD
-    A["Agent submits diagnose action"] --> B{"Service matches\nroot cause?"}
+    A["Agent submits diagnose action"] --> B{"Service matches<br/>root cause?"}
     B -->|"Exact match"| C["+0.40"]
     B -->|"In causal chain"| D["+0.15"]
     B -->|"Wrong"| E["0.00"]
@@ -181,12 +181,12 @@ flowchart TD
     I -->|"Yes"| J["+0.25"]
     I -->|"No"| K["+0.00"]
 
-    J --> EV{"hypothesis_evidence\ncites root service\n+ signal keywords?"}
+    J --> EV{"hypothesis_evidence<br/>cites root service<br/>+ signal keywords?"}
     C --> EV
     EV -->|"Yes"| EVB["up to +0.10"]
     EV -->|"No/empty"| EVN["+0.00"]
 
-    EVB --> P["Apply blind penalty\nand investigation quality"]
+    EVB --> P["Apply blind penalty<br/>and investigation quality"]
     EVN --> P
     K --> P
     E --> P
