@@ -54,17 +54,16 @@ The architecture is informed by three lines of research in microservice observab
 ```mermaid
 flowchart TD
     START(("Start")) --> RESET["reset(task)"]
-    RESET -->|"Generator creates fresh scenario"| GEN["ProceduralScenarioGenerator"]
+    RESET -->|"generates fresh scenario"| GEN["ProceduralScenarioGenerator"]
     GEN --> TEMPORAL["TemporalSimulator initialized"]
     TEMPORAL --> RUNNING["Running"]
-    RUNNING -->|"query_logs / query_metrics<br/>check_topology / trace_request / check_alerts"| PROCESS["Process Action"]
-    PROCESS --> DEGRADE["Temporal: compute<br/>metrics at current step"]
+    RUNNING -->|"investigation action"| PROCESS["Process Action"]
+    PROCESS --> DEGRADE["Temporal: compute metrics"]
     DEGRADE --> REWARD["Compute Reward"]
     REWARD --> UPDATE["Update State"]
     UPDATE --> OBS["Return Observation"]
     OBS -->|"done = false"| RUNNING
-    RUNNING -->|"diagnose action or max_steps reached"| DONE["Done"]
-    DONE -->|"Can reset"| RESET
+    RUNNING -->|"diagnose or max_steps"| DONE["Done"]
     DONE --> END(("End"))
 ```
 
@@ -73,23 +72,20 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph INPUT["Configuration"]
-        DIFF["difficulty:<br/>easy/medium/hard"]
-        SEED["optional seed<br/>for reproducibility"]
+        DIFF["difficulty: easy/medium/hard"] --- SEED["optional seed for reproducibility"]
     end
 
     subgraph GENERATOR["ProceduralScenarioGenerator"]
-        FP["Pick fault pattern<br/>(12 available)"]
-        TOPO["Build networkx DAG<br/>(3-9 services)"]
-        RC["Select root cause<br/>+ causal chain"]
-        SYNTH["Synthesize:<br/>logs, metrics,<br/>alerts, traces"]
+        FP["Pick fault pattern (12 available)"] --> TOPO["Build networkx DAG (3-9 services)"]
+        TOPO --> RC["Select root cause + causal chain"]
+        RC --> SYNTH["Synthesize: logs, metrics, alerts, traces"]
     end
 
     subgraph OUTPUT["Scenario Dict"]
-        SVC["services + topology"]
-        BASELINE["metrics_baseline<br/>(healthy state)"]
-        CRISIS["metrics_crisis<br/>(full cascade)"]
-        LOGS["logs per service"]
-        CHAIN["causal_chain +<br/>causal_distances"]
+        SVC["services + topology"] --- BASELINE["metrics_baseline (healthy state)"]
+        BASELINE --- CRISIS["metrics_crisis (full cascade)"]
+        CRISIS --- LOGS["logs per service"]
+        LOGS --- CHAIN["causal_chain + causal_distances"]
     end
 
     INPUT --> GENERATOR
@@ -101,8 +97,8 @@ flowchart LR
 ```mermaid
 flowchart TD
     A["Agent calls query_metrics(service)"] --> B["TemporalSimulator.compute_metrics()"]
-    B --> C{"Is service in<br/>causal chain?"}
-    C -->|"No"| D["Return baseline<br/>(stable, healthy)"]
+    B --> C{"In causal chain?"}
+    C -->|"No"| D["Return baseline (stable, healthy)"]
     C -->|"Yes"| E["Compute effective progress"]
     E --> F["progress = step / max_steps x 0.75"]
     F --> G["onset_delay = distance x 0.20"]
@@ -166,31 +162,17 @@ Anti-reward-hacking: evidence grounding (must have queried cited service), keywo
 
 ```mermaid
 flowchart TD
-    A["Agent submits diagnose action"] --> B{"Service matches<br/>root cause?"}
-    B -->|"Exact match"| C["+0.40"]
-    B -->|"In causal chain"| D["+0.15"]
-    B -->|"Wrong"| E["0.00"]
-
-    C --> F{"Fault type correct?"}
-    D --> F
-    F -->|"Yes"| G["+0.35"]
-    F -->|"No"| H["+0.00"]
-
-    G --> I{"Remediation correct?"}
-    H --> I
-    I -->|"Yes"| J["+0.25"]
-    I -->|"No"| K["+0.00"]
-
-    J --> EV{"hypothesis_evidence<br/>cites root service<br/>+ signal keywords?"}
-    C --> EV
-    EV -->|"Yes"| EVB["up to +0.10"]
-    EV -->|"No/empty"| EVN["+0.00"]
-
-    EVB --> P["Apply blind penalty<br/>and investigation quality"]
-    EVN --> P
-    K --> P
-    E --> P
-    P --> O["Final score 0.01 - 0.99"]
+    A["Agent submits diagnose action"] --> B{"Service matches root cause?"}
+    B -->|"Exact match +0.40"| F{"Fault type correct?"}
+    B -->|"In causal chain +0.15"| F
+    B -->|"Wrong +0.00"| P
+    F -->|"Yes +0.35"| I{"Remediation correct?"}
+    F -->|"No +0.00"| I
+    I -->|"Yes +0.25"| EV{"Evidence cites root service?"}
+    I -->|"No +0.00"| P
+    EV -->|"Yes up to +0.10"| P
+    EV -->|"No +0.00"| P
+    P["Apply blind penalty and investigation quality"] --> O["Final score 0.01 - 0.99"]
 ```
 
 ## Difficulty Progression
@@ -198,24 +180,15 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Easy["Easy"]
-        E1["3-4 services"]
-        E2["1-2 deep chain"]
-        E3["Clear error logs"]
-        E4["OOM, disk full, cert expiry"]
+        E1["3-4 services"] --- E2["1-2 deep chain"] --- E3["Clear error logs"] --- E4["OOM, disk full, cert expiry"]
     end
 
     subgraph Medium["Medium"]
-        M1["4-6 services"]
-        M2["2-4 deep chain"]
-        M3["Red herrings + noise alerts"]
-        M4["Connection leak, config push, thundering herd"]
+        M1["4-6 services"] --- M2["2-4 deep chain"] --- M3["Red herrings + noise alerts"] --- M4["Connection leak, config push, thundering herd"]
     end
 
     subgraph Hard["Hard"]
-        H1["6-9 services"]
-        H2["3-5 deep chain"]
-        H3["Monitoring blindness + stale metrics"]
-        H4["Kafka staleness, DNS failure, memory leak, deadlock"]
+        H1["6-9 services"] --- H2["3-5 deep chain"] --- H3["Monitoring blindness + stale metrics"] --- H4["Kafka staleness, DNS failure, memory leak, deadlock"]
     end
 
     Easy --> Medium --> Hard

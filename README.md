@@ -34,20 +34,12 @@ This environment fills that gap. It is a controlled, high-fidelity simulator -- 
 ## How It Works
 
 ```mermaid
-graph TB
-    A[Agent / inference.py] -->|"reset(task='easy')"| B[IncidentTriageEnv]
-    B -->|"Observation: incident summary, services"| A
-    A -->|"step(query_logs, 'auth-service')"| B
-    B -->|"Observation: log lines, reward=0.05"| A
-    A -->|"step(diagnose, service, fault, fix, evidence)"| B
-    B -->|"Observation: score=0.85, done=true"| A
-
-    B --> C[ProceduralScenarioGenerator]
-    B --> D[TemporalSimulator]
-    B --> E[grader.py]
-    C --> F["networkx DAG topologies<br/>12 fault patterns<br/>40+ service names"]
-    D --> G["Sigmoid degradation<br/>Causal hop delays<br/>Progressive log reveal"]
-    E --> H["Diagnosis + Evidence scoring<br/>(0.0 - 1.0, partial credit)"]
+flowchart LR
+    A["Agent / inference.py"] -->|"reset / step / diagnose"| B["IncidentTriageEnv"]
+    B -->|"observation + reward"| A
+    B --> C["ProceduralScenarioGenerator<br/>networkx DAG topologies<br/>12 fault patterns, 40+ service names"]
+    B --> D["TemporalSimulator<br/>Sigmoid degradation<br/>Causal hop delays, Progressive log reveal"]
+    B --> E["grader.py<br/>Diagnosis + Evidence scoring<br/>0.0 - 1.0, partial credit"]
 ```
 
 Services are tagged with **criticality tiers** (Tier 1 = critical infrastructure, Tier 2 = application, Tier 3 = observability) visible in topology output. Agents can consult per-service **runbooks** listing known failure modes and standard remediation, just like real SREs.
@@ -59,8 +51,8 @@ Metrics degrade along sigmoid curves. Services further from the root cause start
 ```mermaid
 flowchart TD
     A["Agent calls query_metrics(service)"] --> B["TemporalSimulator.compute_metrics()"]
-    B --> C{"Is service in<br/>causal chain?"}
-    C -->|"No"| D["Return baseline<br/>(stable, healthy)"]
+    B --> C{"In causal chain?"}
+    C -->|"No"| D["Return baseline (stable, healthy)"]
     C -->|"Yes"| E["Compute effective progress"]
     E --> F["progress = step / max_steps x 0.75"]
     F --> G["onset_delay = distance x 0.20"]
@@ -75,24 +67,15 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Easy["Easy"]
-        E1["3-4 services"]
-        E2["1-2 deep chain"]
-        E3["Clear error logs"]
-        E4["OOM, disk full, cert expiry"]
+        E1["3-4 services"] --- E2["1-2 deep chain"] --- E3["Clear error logs"] --- E4["OOM, disk full, cert expiry"]
     end
 
     subgraph Medium["Medium"]
-        M1["4-6 services"]
-        M2["2-4 deep chain"]
-        M3["Red herrings + noise alerts"]
-        M4["Connection leak, config push, thundering herd"]
+        M1["4-6 services"] --- M2["2-4 deep chain"] --- M3["Red herrings + noise alerts"] --- M4["Connection leak, config push, thundering herd"]
     end
 
     subgraph Hard["Hard"]
-        H1["6-9 services"]
-        H2["3-5 deep chain"]
-        H3["Monitoring blindness + stale metrics"]
-        H4["Kafka staleness, DNS failure, memory leak, deadlock"]
+        H1["6-9 services"] --- H2["3-5 deep chain"] --- H3["Monitoring blindness + stale metrics"] --- H4["Kafka staleness, DNS failure, memory leak, deadlock"]
     end
 
     Easy --> Medium --> Hard
@@ -282,9 +265,12 @@ flowchart LR
         CC --> X["Cross-referencing"]
         X --> FO["Focus ratio"]
     end
-    subgraph Penalties
+    subgraph Pen["Penalties"]
         B["Blind diagnosis<br/>-0.30 at 0 steps<br/>-0.15 at 1 step<br/>-0.05 at 2 steps"]
     end
+    Diagnosis --> FINAL["Final Score<br/>0.01 - 0.99"]
+    Investigation --> FINAL
+    Pen --> FINAL
 ```
 
 **Investigation quality scoring** rewards agents that follow good SRE methodology:
